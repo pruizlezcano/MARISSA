@@ -4,9 +4,9 @@ import pandas as pd
 
 from marissa.cluster_algorithm import ClusterAlgorithm
 from marissa.distance_metrics import DistanceAlgorithm
-from marissa.dna.decoder import main as dna_decoder
-from marissa.dna.encoder import main as dna_encoder
 from marissa.Logger import Logger
+from marissa.mafft.decoder import main as mafft_decoder
+from marissa.mafft.encoder import main as mafft_encoder
 from marissa.pcap import Pcap
 from marissa.utils import remove_files
 
@@ -100,7 +100,7 @@ class Marissa:
     def encode_data(self):
         """Encode the data and save it to a file."""
         for cluster_id, cluster_packets in self.df.groupby("cluster"):
-            dna_encoder(
+            mafft_encoder(
                 cluster_packets["raw"],
                 os.path.join(self.output_path, f"input.{cluster_id}.fasta"),
             )
@@ -108,13 +108,13 @@ class Marissa:
     def run(self):
         """Run clustal omega"""
         for cluster_id in self.clusters:
-            self.run_clustal_omega_for_cluster(cluster_id)
+            self.run_mafft_for_cluster(cluster_id)
 
-    def run_clustal_omega_for_cluster(self, cluster_id):
+    def run_mafft_for_cluster(self, cluster_id):
         """Run clustal omega for a specific cluster."""
         self.logger.info(f"Running clustal omega for cluster {cluster_id}")
         os.system(
-            f"clustalo --infile {os.path.join(self.output_path,f"input.{cluster_id}.fasta")} --force --wrap={self.max_length*1000} --outfmt clustal --outfile {os.path.join(self.output_path,f"output.{cluster_id}.clustal_num")} {'--verbose' if self.verbose else ''}"  # noqa E501
+            f"mafft --text {'--quiet' if not self.verbose else ''} {os.path.join(self.output_path,f"input.{cluster_id}.fasta")} > {os.path.join(self.output_path,f"output.{cluster_id}.clustal_num")}"  # noqa E501
         )
 
     def post_run(self):
@@ -126,7 +126,7 @@ class Marissa:
         self.logger.debug("Decoding aligned data")
         for cluster_id in self.clusters:
 
-            data_aligned = dna_decoder(
+            data_aligned = mafft_decoder(
                 os.path.join(self.output_path, f"output.{cluster_id}.clustal_num")
             )
             self.df.loc[self.df["cluster"] == cluster_id, "aligned"] = data_aligned
@@ -192,6 +192,11 @@ class Marissa:
             else:
                 equals += " "
         return equals
+    
+    def mafft_encoder(data, output_file):
+        with open(output_file, "w") as f:
+            for i, item in enumerate(data):
+                f.write(f">MSG.{i}\n{item}\n")
 
     def save_cluster_data_to_pcap(self):
         """Save data for each cluster to a pcap file."""
