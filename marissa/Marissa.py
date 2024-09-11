@@ -25,6 +25,7 @@ class Marissa:
         header_length: int = None,
         distance_algorithm: DistanceAlgorithm = None,
         cluster_algorithm: ClusterAlgorithm = None,
+        group_by_ethernet: bool = False,
     ):
         self.input_file = input_file
         self.output_file = output_file
@@ -40,6 +41,7 @@ class Marissa:
         self.pcap = Pcap(input_file)
         self.distance_algorithm: DistanceAlgorithm = distance_algorithm()
         self.cluster_algorithm: ClusterAlgorithm = cluster_algorithm
+        self.group_by_ethernet = group_by_ethernet
 
     def prepare(self):
         """Prepare the data for the clustal test."""
@@ -48,8 +50,8 @@ class Marissa:
             self.filter_data_by_packet_length()
         self.df = self.df.head(1000)
         self.max_length = max(self.df["length"])
-        if self.header_length is not None:
-            self.remove_header()
+        if self.header_length is not None and not self.group_by_ethernet:
+            self.remove_header(self.header_length)
         self.clusterize()
         self.encode_data()
 
@@ -62,6 +64,9 @@ class Marissa:
         self.df["original"] = self.df["raw"]
         self.df["length"] = self.df["raw"].apply(lambda x: len(x) // 2)
         self.df["id"] = self.df.index + 1
+        if self.group_by_ethernet:
+            self.df["ethernet"] = self.df["raw"].apply(lambda x: x[:24])
+            self.remove_header(max(12, self.header_length or 0))
 
     def filter_data_by_packet_length(self):
         """Filter data by packet length if packet_length is specified."""
@@ -76,26 +81,36 @@ class Marissa:
             ]
         self.logger.info(f"{len(self.df)} packets remain after filtering by length")
 
-    def remove_header(self):
+    def remove_header(self, header_length: int):
         """Add header length to raw data if header_length is specified."""
-        if self.header_length is not None:
-            self.logger.debug("Removing header from data")
-            self.df["raw"] = [x[self.header_length :] for x in self.df["raw"]]
+        self.logger.debug("Removing header from data")
+        self.df["raw"] = [x[header_length*2:] for x in self.df["raw"]]
 
     def clusterize(self):
         """Clusterize the data using KMeans"""
+        
+        if self.group_by_ethernet:            
+            # get groups of packets with the same ethernet header
+            self.df["group"] = self.df.groupby("ethernet").ngroup()
+            
+            for group_id, group_packets in self.df.groupby("group"):
+                nodes = [
+                    self.distance_algorithm.calculate_node(packet) for packet in group_packets["raw"]
+                ]
+                clusterizer = self.cluster_algorithm(nodes, self.distance_algorithm)
+                self.df.loc[self.df["group"] == group_id, "cluster"] = list(map(lambda x: f"{group_id}s{x}", clusterizer.perform_clustering()))
+        else:
+            nodes = [
+                self.distance_algorithm.calculate_node(packet) for packet in self.df["raw"]
+            ]
+            clusterizer = self.cluster_algorithm(nodes, self.distance_algorithm)
 
-        nodes = [
-            self.distance_algorithm.calculate_node(packet) for packet in self.df["raw"]
-        ]
-        clusterizer = self.cluster_algorithm(nodes, self.distance_algorithm)
-
-        self.logger.debug("Performing clustering...")
-        self.df["cluster"] = clusterizer.perform_clustering()
+            self.logger.debug("Performing clustering...")
+            self.df["cluster"] = clusterizer.perform_clustering()
         self.clusters = self.df["cluster"].unique()
         self.logger.info(f"Clustering done. Found {len(self.clusters)} clusters")
         self.df["id_cluster"] = self.df.groupby("cluster").cumcount()
-        # clusterizer.plot(self.df["cluster"])
+            # clusterizer.plot(self.df["cluster"])
 
     def encode_data(self):
         """Encode the data and save it to a file."""

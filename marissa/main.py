@@ -86,8 +86,13 @@ def main(
         help="The cluster algorithm to use.",
         case_sensitive=False,
     ),
+    group_by_ethernet: bool = typer.Option(
+        False,
+        "--group_by_ethernet",
+        "-eth",
+        help="Group packets by it's ethernet header and remove it before clustering.",
+    ),
 ):
-    header_length = header_length * 2 if header_length is not None else None
     distance_type = {
         Distance_Types.tlsh: TLSHDistance,
         Distance_Types.ssdeep: SSDEEPDistance,
@@ -112,6 +117,7 @@ def main(
         header_length=header_length,
         distance_algorithm=distance_type,
         cluster_algorithm=cluster_type,
+        group_by_ethernet=group_by_ethernet,
     )
     marissa_runner.execute()
 
