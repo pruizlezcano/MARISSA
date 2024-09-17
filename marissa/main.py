@@ -4,9 +4,11 @@ from enum import Enum
 import typer
 
 from marissa import (
+    ClustaloAlgorithm,
     HammingDistance,
     KMeansAlgorithm,
     KMeansHierarchicalAlgorithm,
+    MafftAlgorithm,
     Marissa,
     OpticsAlgorithm,
     SSDEEPDistance,
@@ -31,6 +33,10 @@ class Cluster_Types(str, Enum):
     optics = "optics"
     kmeans = "kmeans"
     kmeans_hierarchical = "kmeans_hierarchical"
+    
+class Align_Types(str, Enum):
+    clustalo = "clustalo"
+    mafft = "mafft"
 
 
 @app.callback()
@@ -86,11 +92,23 @@ def main(
         help="The cluster algorithm to use.",
         case_sensitive=False,
     ),
+    align_type: Align_Types = typer.Option(
+        Align_Types.mafft,
+        "--align-algorithm",
+        "-a",
+        help="The align algorithm to use.",
+        case_sensitive=False,
+    ),
     group_by_ethernet: bool = typer.Option(
         False,
         "--group_by_ethernet",
         "-eth",
         help="Group packets by it's ethernet header and remove it before clustering.",
+    ),
+    remove_duplicates: bool = typer.Option(
+        False,
+        "--remove-duplicates",
+        help="Remove duplicate packets before clustering.",
     ),
 ):
     distance_type = {
@@ -103,6 +121,10 @@ def main(
         Cluster_Types.kmeans: KMeansAlgorithm,
         Cluster_Types.kmeans_hierarchical: KMeansHierarchicalAlgorithm,
     }[cluster_type]
+    align_type = {
+        Align_Types.mafft: MafftAlgorithm,
+        Align_Types.clustalo: ClustaloAlgorithm,
+    }[align_type]
     pcap_name = os.path.basename(pcap)
     results_path = f"./results/{pcap_name}"
     os.makedirs(results_path, exist_ok=True)
@@ -117,7 +139,9 @@ def main(
         header_length=header_length,
         distance_algorithm=distance_type,
         cluster_algorithm=cluster_type,
+        align_algorithm=align_type,
         group_by_ethernet=group_by_ethernet,
+        remove_duplicates=remove_duplicates,
     )
     marissa_runner.execute()
 

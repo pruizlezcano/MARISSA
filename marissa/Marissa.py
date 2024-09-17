@@ -2,11 +2,10 @@ import os
 
 import pandas as pd
 
+from marissa.alignment_algorithm import AlignmentAlgorithm
 from marissa.cluster_algorithm import ClusterAlgorithm
 from marissa.distance_metrics import DistanceAlgorithm
 from marissa.Logger import Logger
-from marissa.mafft.decoder import main as mafft_decoder
-from marissa.mafft.encoder import main as mafft_encoder
 from marissa.pcap import Pcap
 from marissa.utils import remove_files
 
@@ -25,7 +24,9 @@ class Marissa:
         header_length: int = None,
         distance_algorithm: DistanceAlgorithm = None,
         cluster_algorithm: ClusterAlgorithm = None,
+        align_algorithm: AlignmentAlgorithm = None,
         group_by_ethernet: bool = False,
+        remove_duplicates: bool = False,
     ):
         self.input_file = input_file
         self.output_file = output_file
@@ -41,17 +42,21 @@ class Marissa:
         self.pcap = Pcap(input_file)
         self.distance_algorithm: DistanceAlgorithm = distance_algorithm()
         self.cluster_algorithm: ClusterAlgorithm = cluster_algorithm
+        self.align_algorithm: AlignmentAlgorithm = align_algorithm()
         self.group_by_ethernet = group_by_ethernet
+        self.remove_duplicates = remove_duplicates
 
     def prepare(self):
         """Prepare the data for the clustal test."""
         self.load_data()
         if self.packet_length is not None:
             self.filter_data_by_packet_length()
-        self.df = self.df.head(1000)
-        self.max_length = max(self.df["length"])
         if self.header_length is not None and not self.group_by_ethernet:
             self.remove_header(self.header_length)
+        if self.remove_duplicates:
+            self.remove_duplicate_packets()
+        self.df = self.df.head(1000)
+        self.max_length = max(self.df["length"])
         self.clusterize()
         self.encode_data()
 
@@ -84,24 +89,34 @@ class Marissa:
     def remove_header(self, header_length: int):
         """Add header length to raw data if header_length is specified."""
         self.logger.debug("Removing header from data")
-        self.df["raw"] = [x[header_length*2:] for x in self.df["raw"]]
+        self.df["raw"] = [x[header_length * 2 :] for x in self.df["raw"]]
+
+    def remove_duplicate_packets(self):
+        """Remove duplicate packets from the data."""
+        self.logger.debug("Removing duplicate packets")
+        self.df = self.df.drop_duplicates("raw")
+        self.logger.info(f"{len(self.df)} packets remain after removing duplicates")
 
     def clusterize(self):
         """Clusterize the data using KMeans"""
-        
-        if self.group_by_ethernet:            
+
+        if self.group_by_ethernet:
             # get groups of packets with the same ethernet header
             self.df["group"] = self.df.groupby("ethernet").ngroup()
-            
+
             for group_id, group_packets in self.df.groupby("group"):
                 nodes = [
-                    self.distance_algorithm.calculate_node(packet) for packet in group_packets["raw"]
+                    self.distance_algorithm.calculate_node(packet)
+                    for packet in group_packets["raw"]
                 ]
                 clusterizer = self.cluster_algorithm(nodes, self.distance_algorithm)
-                self.df.loc[self.df["group"] == group_id, "cluster"] = list(map(lambda x: f"{group_id}s{x}", clusterizer.perform_clustering()))
+                self.df.loc[self.df["group"] == group_id, "cluster"] = list(
+                    map(lambda x: f"{group_id}s{x}", clusterizer.perform_clustering())
+                )
         else:
             nodes = [
-                self.distance_algorithm.calculate_node(packet) for packet in self.df["raw"]
+                self.distance_algorithm.calculate_node(packet)
+                for packet in self.df["raw"]
             ]
             clusterizer = self.cluster_algorithm(nodes, self.distance_algorithm)
 
@@ -110,12 +125,12 @@ class Marissa:
         self.clusters = self.df["cluster"].unique()
         self.logger.info(f"Clustering done. Found {len(self.clusters)} clusters")
         self.df["id_cluster"] = self.df.groupby("cluster").cumcount()
-            # clusterizer.plot(self.df["cluster"])
+        # clusterizer.plot(self.df["cluster"])
 
     def encode_data(self):
         """Encode the data and save it to a file."""
         for cluster_id, cluster_packets in self.df.groupby("cluster"):
-            mafft_encoder(
+            self.align_algorithm.encode(
                 cluster_packets["raw"],
                 os.path.join(self.output_path, f"input.{cluster_id}.fasta"),
             )
@@ -123,14 +138,12 @@ class Marissa:
     def run(self):
         """Run clustal omega"""
         for cluster_id in self.clusters:
-            self.run_mafft_for_cluster(cluster_id)
-
-    def run_mafft_for_cluster(self, cluster_id):
-        """Run clustal omega for a specific cluster."""
-        self.logger.info(f"Running clustal omega for cluster {cluster_id}")
-        os.system(
-            f"mafft --text {'--quiet' if not self.verbose else ''} {os.path.join(self.output_path,f"input.{cluster_id}.fasta")} > {os.path.join(self.output_path,f"output.{cluster_id}.clustal_num")}"  # noqa E501
-        )
+            self.logger.info(f"Running aligment for cluster {cluster_id}")
+            self.align_algorithm.run(
+                self.verbose,
+                os.path.join(self.output_path, f"input.{cluster_id}.fasta"),
+                os.path.join(self.output_path, f"output.{cluster_id}.clustal_num"),
+            )
 
     def post_run(self):
         """Post run actions"""
@@ -141,7 +154,7 @@ class Marissa:
         self.logger.debug("Decoding aligned data")
         for cluster_id in self.clusters:
 
-            data_aligned = mafft_decoder(
+            data_aligned = self.align_algorithm.decode(
                 os.path.join(self.output_path, f"output.{cluster_id}.clustal_num")
             )
             self.df.loc[self.df["cluster"] == cluster_id, "aligned"] = data_aligned
@@ -172,7 +185,8 @@ class Marissa:
             f.write(
                 f"Distance Algorithm: {self.distance_algorithm.__class__.__name__} - "
             )
-            f.write(f"Cluster Algorithm: {self.cluster_algorithm.__qualname__}\n")
+            f.write(f"Cluster Algorithm: {self.cluster_algorithm.__qualname__} - ")
+            f.write(f"Align Algorithm: {self.align_algorithm.__class__.__name__}\n")
             f.write(f"Clusters: {len(self.clusters)}\n")
             f.write(
                 f"\n* if all packets are equal\n. if at least {self.percent_equal*100}% of the packets are equal\n\n"
@@ -188,9 +202,8 @@ class Marissa:
             f.write(
                 f"{str(packet['id_cluster']).zfill(id_length)}: {packet['aligned']}\n"
             )
-        f.write(
-            f"{' '*(id_length+2)}{self.print_align(cluster_packets['aligned'])}\n\n"
-        )
+        equals = self.print_align(cluster_packets["aligned"])
+        f.write(f"{' '*(id_length+2)}{equals}\n\n")
 
     def print_align(
         self,
@@ -207,11 +220,6 @@ class Marissa:
             else:
                 equals += " "
         return equals
-    
-    def mafft_encoder(data, output_file):
-        with open(output_file, "w") as f:
-            for i, item in enumerate(data):
-                f.write(f">MSG.{i}\n{item}\n")
 
     def save_cluster_data_to_pcap(self):
         """Save data for each cluster to a pcap file."""
