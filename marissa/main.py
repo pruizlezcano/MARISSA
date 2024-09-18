@@ -10,6 +10,7 @@ from marissa import (
     KMeansHierarchicalAlgorithm,
     MafftAlgorithm,
     Marissa,
+    MuscleAlgorithm,
     OpticsAlgorithm,
     SSDEEPDistance,
     TLSHDistance,
@@ -33,10 +34,12 @@ class Cluster_Types(str, Enum):
     optics = "optics"
     kmeans = "kmeans"
     kmeans_hierarchical = "kmeans_hierarchical"
-    
+
+
 class Align_Types(str, Enum):
     clustalo = "clustalo"
     mafft = "mafft"
+    muscle = "muscle"
 
 
 @app.callback()
@@ -124,6 +127,7 @@ def main(
     align_type = {
         Align_Types.mafft: MafftAlgorithm,
         Align_Types.clustalo: ClustaloAlgorithm,
+        Align_Types.muscle: MuscleAlgorithm,
     }[align_type]
     pcap_name = os.path.basename(pcap)
     results_path = f"./results/{pcap_name}"
