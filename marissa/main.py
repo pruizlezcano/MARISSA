@@ -5,6 +5,7 @@ import typer
 
 from marissa import (
     ClustaloAlgorithm,
+    FamsaAlgorithm,
     HammingDistance,
     KMeansAlgorithm,
     KMeansHierarchicalAlgorithm,
@@ -40,6 +41,7 @@ class Align_Types(str, Enum):
     clustalo = "clustalo"
     mafft = "mafft"
     muscle = "muscle"
+    famsa = "famsa"
 
 
 @app.callback()
@@ -128,6 +130,7 @@ def main(
         Align_Types.mafft: MafftAlgorithm,
         Align_Types.clustalo: ClustaloAlgorithm,
         Align_Types.muscle: MuscleAlgorithm,
+        Align_Types.famsa: FamsaAlgorithm,
     }[align_type]
     pcap_name = os.path.basename(pcap)
     results_path = f"./results/{pcap_name}"

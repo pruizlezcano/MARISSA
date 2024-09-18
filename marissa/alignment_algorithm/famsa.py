@@ -3,12 +3,10 @@ import os
 from marissa.alignment_algorithm import AlignmentAlgorithm
 
 
-class MuscleAlgorithm(AlignmentAlgorithm):
+class FamsaAlgorithm(AlignmentAlgorithm):
 
     def __init__(self):
         super().__init__()
 
     def run(self, verbose: bool, input_file: str, output_file: str) -> None:
-        os.system(
-            f"muscle {'--quiet' if not verbose else ''} -super5 {input_file} -output {output_file}"
-        )
+        os.system(f"famsa {'-v' if verbose else ''} {input_file} {output_file}")
