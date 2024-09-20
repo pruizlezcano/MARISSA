@@ -13,6 +13,7 @@ from marissa import (
     Marissa,
     MuscleAlgorithm,
     OpticsAlgorithm,
+    ProbconsAlgorithm,
     SSDEEPDistance,
     TLSHDistance,
 )
@@ -42,6 +43,7 @@ class Align_Types(str, Enum):
     mafft = "mafft"
     muscle = "muscle"
     famsa = "famsa"
+    probcons = "probcons"
 
 
 @app.callback()
@@ -131,6 +133,7 @@ def main(
         Align_Types.clustalo: ClustaloAlgorithm,
         Align_Types.muscle: MuscleAlgorithm,
         Align_Types.famsa: FamsaAlgorithm,
+        Align_Types.probcons: ProbconsAlgorithm,
     }[align_type]
     pcap_name = os.path.basename(pcap)
     results_path = f"./results/{pcap_name}"
