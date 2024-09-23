@@ -30,7 +30,7 @@ class KMeansAlgorithm(ClusterAlgorithm):
             int: Optimal number of clusters.
         """
         y = []
-        max_clusters = min(9, len(distances))
+        max_clusters = min(100, len(distances))
         for i in range(1, max_clusters):
             kmeans = KMeans(n_clusters=i, init="random", max_iter=1000, random_state=0)
             kmeans.fit(distances)

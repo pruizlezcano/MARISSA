@@ -157,6 +157,12 @@ class Marissa:
             data_aligned = self.align_algorithm.decode(
                 os.path.join(self.output_path, f"output.{cluster_id}.clustal_num")
             )
+            if len(data_aligned) == 0:
+                self.logger.warning(
+                    f"Cluster {cluster_id} has no aligned data. Skipping..."
+                )
+                self.df = self.df[self.df["cluster"] != cluster_id]
+                continue
             self.df.loc[self.df["cluster"] == cluster_id, "aligned"] = data_aligned
 
     def cleanup(self):

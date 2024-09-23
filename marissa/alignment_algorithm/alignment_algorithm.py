@@ -59,6 +59,10 @@ class AlignmentAlgorithm(ABC):
         Returns:
             list[int]: Decoded data.
         """
+        # check if the file exists
+        if not os.path.isfile(input_file):
+            self.logger.warning(f"{input_file}: Not a file")
+            return []
         data = self.read_file(os.path.abspath(input_file))
         data = "".join(data)
         data = data.split(">")
