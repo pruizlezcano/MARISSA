@@ -209,7 +209,64 @@ class Marissa:
                 f"{str(packet['id_cluster']).zfill(id_length)}: {packet['aligned']}\n"
             )
         equals = self.print_align(cluster_packets["aligned"])
-        f.write(f"{' '*(id_length+2)}{equals}\n\n")
+        f.write(f"{' '*(id_length+2)}{equals}\n")
+        fields = self.find_fields(cluster_packets["aligned"])
+        f.write(f"{", ".join(map(lambda x: f"{int(x[0]/2)}{x[1]}", fields))}\n\n")
+
+    @staticmethod
+    def _has_even_bytes(fields) -> bool:
+        for i in fields:
+            if len(i) % 2 != 0:
+                return False
+        return True
+
+    @staticmethod
+    def _is_variable_field(fields) -> bool:
+        for i in fields:
+            if "-" in i:
+                return True
+        return False
+
+    def find_fields(self, packets: list[str]) -> list:
+        """Find fields in the packets.
+
+        Args:
+            packets (list[str]): List of packets
+
+        Returns:
+            list: List of fields
+        """
+        message_length = len(max(packets, key=len))
+        results_fields = []
+        i = 0
+        isLastStatic = False
+        while i < message_length:
+            offset = 2
+            while i + offset <= message_length:
+                field = [packet[i : i + offset] for packet in packets]
+                if not self._has_even_bytes(field):
+                    offset += 1
+                    continue
+                else:
+                    break
+            if not len(set(field)) == 1:
+                if self._is_variable_field(field):
+                    fields_info = [offset, "V"]
+                else:
+                    fields_info = [offset, "D"]
+                results_fields.append(fields_info)
+                isLastStatic = False
+            else:
+                if isLastStatic:
+                    results_fields[-1][0] += offset
+                else:
+                    fields_info = [offset, "S"]
+                    results_fields.append(fields_info)
+                isLastStatic = True
+
+            i += offset
+
+        return results_fields
 
     def print_align(
         self,
