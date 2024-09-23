@@ -1,3 +1,5 @@
+from typing import List
+
 from sklearn.cluster import OPTICS
 
 from marissa.cluster_algorithm import ClusterAlgorithm
@@ -9,7 +11,7 @@ class OpticsAlgorithm(ClusterAlgorithm):
     def __init__(self, data, distance_algorithm: DistanceAlgorithm):
         super().__init__(data, distance_algorithm)
 
-    def perform_clustering(self):
+    def perform_clustering(self) -> List[int]:
         """Perform OPTICS clustering on the data."""
         clustering = OPTICS().fit_predict(self.distances)
 

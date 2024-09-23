@@ -1,6 +1,7 @@
 import os
 import re
 from abc import ABC, abstractmethod
+from typing import List
 
 from marissa.Logger import Logger
 
@@ -50,14 +51,14 @@ class AlignmentAlgorithm(ABC):
             dna = dna.replace(value, key)
         return dna
 
-    def decode(self, input_file: str) -> list[int]:
+    def decode(self, input_file: str) -> List[str]:
         """Decode the data from a file.
 
         Args:
             input_file (str): File to read the encoded data from.
 
         Returns:
-            list[int]: Decoded data.
+            list[str]: Decoded data.
         """
         # check if the file exists
         if not os.path.isfile(input_file):
@@ -69,7 +70,7 @@ class AlignmentAlgorithm(ABC):
         data = [re.sub(r"(MSG\.\d*)", r"\1 ", i) for i in data]
         data = [i for i in data if i]
         data = sorted(data, key=lambda x: int(x.split(" ")[0].split(".")[1]))
-        packets = []
+        packets: List[str] = []
         for line in data:
             if line.startswith("MSG."):
                 (_, msg) = [item for item in line.split(" ") if item]
@@ -89,7 +90,7 @@ class AlignmentAlgorithm(ABC):
         """Run the alignment algorithm."""
         pass
 
-    def read_file(self, filename: str) -> list[str]:
+    def read_file(self, filename: str) -> List[str]:
         if os.path.isfile(filename):
             with open(filename, "r") as f:
                 return f.read().splitlines()

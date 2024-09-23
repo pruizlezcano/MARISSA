@@ -34,7 +34,7 @@ class ClusterAlgorithm(ABC):
         return distances
 
     @abstractmethod
-    def perform_clustering(self):
+    def perform_clustering(self) -> List[int]:
         """Perform clustering on the data."""
         pass
 

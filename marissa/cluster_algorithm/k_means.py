@@ -1,3 +1,6 @@
+from typing import List
+
+import matplotlib.pyplot as plt
 import numpy as np
 from kneed import KneeLocator
 from sklearn.cluster import KMeans
@@ -11,7 +14,7 @@ class KMeansAlgorithm(ClusterAlgorithm):
     def __init__(self, data, distance_algorithm: DistanceAlgorithm):
         super().__init__(data, distance_algorithm)
 
-    def perform_clustering(self):
+    def perform_clustering(self) -> List[int]:
         """Perform KMeans clustering on the data."""
         n_clusters = self.calculate_optimal_clusters(self.distances)
         clustering = KMeans(

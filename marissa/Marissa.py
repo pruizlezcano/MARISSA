@@ -214,7 +214,7 @@ class Marissa:
     def print_align(
         self,
         packets: list[str],
-    ):
+    ) -> str:
         equals = ""
         for i in range(len(max(packets, key=len))):
             chars = [packet[i] for packet in packets if i < len(packet)]
