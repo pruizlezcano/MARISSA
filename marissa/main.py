@@ -54,6 +54,12 @@ def main(
         "-i",
         help="The pcap file to read",
     ),
+    output: str = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="The output directory to write the results. Default: ./results/<pcap_name>/",
+    ),
     verbose: bool = typer.Option(
         False,
         "--verbose",
@@ -79,11 +85,10 @@ def main(
         "-e",
         help="The percentage of equal packets to consider. [0-1]",
     ),
-    header_length: int = typer.Option(
+    remove_headers: bool = typer.Option(
         None,
-        "--header-length",
-        "-h",
-        help="The length of the header of the packets.",
+        "--remove-headers",
+        help="Remove headers from the packets.",
     ),
     distance_type: Distance_Types = typer.Option(
         Distance_Types.ssdeep,
@@ -136,7 +141,7 @@ def main(
         Align_Types.probcons: ProbconsAlgorithm,
     }[align_type]
     pcap_name = os.path.basename(pcap)
-    results_path = f"./results/{pcap_name}"
+    results_path = f"./results/{pcap_name}" if output is None else output
     os.makedirs(results_path, exist_ok=True)
 
     marissa_runner = Marissa(
@@ -146,7 +151,7 @@ def main(
         packet_length=packet_length,
         packet_length_variance=packet_length_variance,
         percent_equal=percent_equal,
-        header_length=header_length,
+        remove_headers=remove_headers,
         distance_algorithm=distance_type,
         cluster_algorithm=cluster_type,
         align_algorithm=align_type,

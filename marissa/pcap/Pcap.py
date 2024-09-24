@@ -1,4 +1,5 @@
 import logging
+from typing import List
 
 import scapy.all as scapy
 
@@ -13,16 +14,16 @@ class Pcap:
         filename,
     ):
         self.filename = filename
-        self.content = []
 
-    def load(self) -> list[Packet]:
+    def load(self) -> List[Packet]:
+        content = []
         with open(self.filename, "rb") as f:
             pcap = scapy.rdpcap(f)
             for packet in pcap:
-                self.content.append(Packet(packet))
+                content.append(Packet(packet))
 
-        return self.content
+        return content
 
-    def write(self, packets: list[str], filename: str):
+    def write(self, packets: list[str], filename: str) -> None:
         packets = [bytes.fromhex(packet) for packet in packets]
         scapy.wrpcap(filename, packets)

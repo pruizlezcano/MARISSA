@@ -21,7 +21,7 @@ class Marissa:
         percent_equal: int = 1,
         input_file=None,
         output_file=None,
-        header_length: int = None,
+        remove_headers: bool = False,
         distance_algorithm: DistanceAlgorithm = None,
         cluster_algorithm: ClusterAlgorithm = None,
         align_algorithm: AlignmentAlgorithm = None,
@@ -36,7 +36,7 @@ class Marissa:
         self.packet_length = packet_length
         self.packet_length_variance = packet_length_variance
         self.percent_equal = percent_equal
-        self.header_length = header_length
+        self.remove_headers = remove_headers
         self.clusters: int
         self.logger = Logger(verbose)
         self.pcap = Pcap(input_file)
@@ -51,10 +51,11 @@ class Marissa:
         self.load_data()
         if self.packet_length is not None:
             self.filter_data_by_packet_length()
-        if self.header_length is not None and not self.group_by_ethernet:
-            self.remove_header(self.header_length)
+        if self.remove_headers:
+            self.remove_header()
         if self.remove_duplicates:
             self.remove_duplicate_packets()
+        self.df = self.df.dropna()
         self.df = self.df.head(1000)
         self.max_length = max(self.df["length"])
         self.clusterize()
@@ -65,13 +66,13 @@ class Marissa:
         self.logger.debug("Loading data from input file")
         packets = self.pcap.load()
         self.logger.info(f"Loaded {len(packets)} packets")
-        self.df = pd.DataFrame([i.hex for i in packets], columns=["raw"])
-        self.df["original"] = self.df["raw"]
-        self.df["length"] = self.df["raw"].apply(lambda x: len(x) // 2)
+        self.df = pd.DataFrame([i for i in packets], columns=["raw"])
+        self.df["hex"] = self.df["raw"].apply(str)
+        self.df["original"] = self.df["hex"]
+        self.df["length"] = self.df["hex"].apply(lambda x: len(x) // 2)
         self.df["id"] = self.df.index + 1
         if self.group_by_ethernet:
-            self.df["ethernet"] = self.df["raw"].apply(lambda x: x[:24])
-            self.remove_header(max(12, self.header_length or 0))
+            self.df["ethernet"] = self.df["hex"].apply(lambda x: x[:24])
 
     def filter_data_by_packet_length(self):
         """Filter data by packet length if packet_length is specified."""
@@ -86,20 +87,21 @@ class Marissa:
             ]
         self.logger.info(f"{len(self.df)} packets remain after filtering by length")
 
-    def remove_header(self, header_length: int):
+    def remove_header(self):
         """Add header length to raw data if header_length is specified."""
-        self.logger.debug("Removing header from data")
-        self.df["raw"] = [x[header_length * 2 :] for x in self.df["raw"]]
+        self.logger.debug("Removing headers from data")
+        self.df["hex"] = [x.get_applayer() for x in self.df["raw"]]
 
     def remove_duplicate_packets(self):
         """Remove duplicate packets from the data."""
         self.logger.debug("Removing duplicate packets")
-        self.df = self.df.drop_duplicates("raw")
+        self.df = self.df.drop_duplicates("hex")
+        self.df = self.df.reset_index(drop=True)
         self.logger.info(f"{len(self.df)} packets remain after removing duplicates")
 
     def clusterize(self):
         """Clusterize the data using KMeans"""
-
+        self.logger.debug("Performing clustering...")
         if self.group_by_ethernet:
             # get groups of packets with the same ethernet header
             self.df["group"] = self.df.groupby("ethernet").ngroup()
@@ -107,7 +109,7 @@ class Marissa:
             for group_id, group_packets in self.df.groupby("group"):
                 nodes = [
                     self.distance_algorithm.calculate_node(packet)
-                    for packet in group_packets["raw"]
+                    for packet in group_packets["hex"]
                 ]
                 clusterizer = self.cluster_algorithm(nodes, self.distance_algorithm)
                 self.df.loc[self.df["group"] == group_id, "cluster"] = list(
@@ -116,11 +118,9 @@ class Marissa:
         else:
             nodes = [
                 self.distance_algorithm.calculate_node(packet)
-                for packet in self.df["raw"]
+                for packet in self.df["hex"]
             ]
             clusterizer = self.cluster_algorithm(nodes, self.distance_algorithm)
-
-            self.logger.debug("Performing clustering...")
             self.df["cluster"] = clusterizer.perform_clustering()
         self.clusters = self.df["cluster"].unique()
         self.logger.info(f"Clustering done. Found {len(self.clusters)} clusters")
@@ -131,14 +131,15 @@ class Marissa:
         """Encode the data and save it to a file."""
         for cluster_id, cluster_packets in self.df.groupby("cluster"):
             self.align_algorithm.encode(
-                cluster_packets["raw"],
+                cluster_packets["hex"],
                 os.path.join(self.output_path, f"input.{cluster_id}.fasta"),
             )
 
     def run(self):
-        """Run clustal omega"""
+        """Run the alignment algorithm."""
+        self.logger.info("Aligning data")
         for cluster_id in self.clusters:
-            self.logger.info(f"Running aligment for cluster {cluster_id}")
+            self.logger.debug(f"Running aligment for cluster {cluster_id}")
             self.align_algorithm.run(
                 self.verbose,
                 os.path.join(self.output_path, f"input.{cluster_id}.fasta"),
@@ -151,7 +152,7 @@ class Marissa:
 
     def decode_aligned_data(self):
         """Decode aligned data for each cluster."""
-        self.logger.debug("Decoding aligned data")
+        self.logger.info("Decoding aligned data")
         for cluster_id in self.clusters:
 
             data_aligned = self.align_algorithm.decode(
@@ -210,6 +211,7 @@ class Marissa:
             )
         equals = self.print_align(cluster_packets["aligned"])
         f.write(f"{' '*(id_length+2)}{equals}\n")
+        self.logger.debug(f"Finding fields for cluster {cluster_id}")
         fields = self.find_fields(cluster_packets["aligned"])
         f.write(f"{", ".join(map(lambda x: f"{int(x[0]/2)}{x[1]}", fields))}\n\n")
 
