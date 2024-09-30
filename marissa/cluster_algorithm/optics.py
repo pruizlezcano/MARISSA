@@ -13,6 +13,5 @@ class OpticsAlgorithm(ClusterAlgorithm):
 
     def perform_clustering(self) -> List[int]:
         """Perform OPTICS clustering on the data."""
-        clustering = OPTICS().fit_predict(self.distances)
-
+        clustering = OPTICS(min_samples=2).fit_predict(self.distances)
         return clustering

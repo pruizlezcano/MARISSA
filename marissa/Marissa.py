@@ -7,7 +7,7 @@ from marissa.cluster_algorithm import ClusterAlgorithm
 from marissa.distance_metrics import DistanceAlgorithm
 from marissa.Logger import Logger
 from marissa.pcap import Pcap
-from marissa.utils import remove_files
+from marissa.utils import find_fields, remove_files
 
 
 class Marissa:
@@ -37,7 +37,7 @@ class Marissa:
         self.packet_length_variance = packet_length_variance
         self.percent_equal = percent_equal
         self.remove_headers = remove_headers
-        self.clusters: int
+        self.clusters: list[str]
         self.logger = Logger(verbose)
         self.pcap = Pcap(input_file)
         self.distance_algorithm: DistanceAlgorithm = distance_algorithm()
@@ -45,10 +45,12 @@ class Marissa:
         self.align_algorithm: AlignmentAlgorithm = align_algorithm()
         self.group_by_ethernet = group_by_ethernet
         self.remove_duplicates = remove_duplicates
+        self.df: pd.DataFrame
 
     def prepare(self):
         """Prepare the data for the clustal test."""
         self.load_data()
+        self.df = self.df.head(1000)
         if self.packet_length is not None:
             self.filter_data_by_packet_length()
         if self.remove_headers:
@@ -56,10 +58,8 @@ class Marissa:
         if self.remove_duplicates:
             self.remove_duplicate_packets()
         self.df = self.df.dropna()
-        self.df = self.df.head(1000)
         self.max_length = max(self.df["length"])
         self.clusterize()
-        self.encode_data()
 
     def load_data(self):
         """Load data from input file and calculate necessary features."""
@@ -107,21 +107,20 @@ class Marissa:
             self.df["group"] = self.df.groupby("ethernet").ngroup()
 
             for group_id, group_packets in self.df.groupby("group"):
-                nodes = [
-                    self.distance_algorithm.calculate_node(packet)
-                    for packet in group_packets["hex"]
-                ]
-                clusterizer = self.cluster_algorithm(nodes, self.distance_algorithm)
+                clusterizer = self.cluster_algorithm(
+                    group_packets["hex"], self.distance_algorithm
+                )
                 self.df.loc[self.df["group"] == group_id, "cluster"] = list(
                     map(lambda x: f"{group_id}s{x}", clusterizer.perform_clustering())
                 )
         else:
-            nodes = [
-                self.distance_algorithm.calculate_node(packet)
-                for packet in self.df["hex"]
-            ]
-            clusterizer = self.cluster_algorithm(nodes, self.distance_algorithm)
-            self.df["cluster"] = clusterizer.perform_clustering()
+            clusterizer = self.cluster_algorithm(
+                self.df["hex"], self.distance_algorithm
+            )
+            self.df["cluster"] = list(
+                map(lambda x: f"{x}", clusterizer.perform_clustering())
+            )
+
         self.clusters = self.df["cluster"].unique()
         self.logger.info(f"Clustering done. Found {len(self.clusters)} clusters")
         self.df["id_cluster"] = self.df.groupby("cluster").cumcount()
@@ -136,7 +135,8 @@ class Marissa:
             )
 
     def run(self):
-        """Run the alignment algorithm."""
+        """Run the algorithm."""
+        self.encode_data()
         self.logger.info("Aligning data")
         for cluster_id in self.clusters:
             self.logger.debug(f"Running aligment for cluster {cluster_id}")
@@ -149,12 +149,14 @@ class Marissa:
     def post_run(self):
         """Post run actions"""
         self.decode_aligned_data()
+        self.get_fields()
+        self.merge_clusters()
 
     def decode_aligned_data(self):
         """Decode aligned data for each cluster."""
         self.logger.info("Decoding aligned data")
         for cluster_id in self.clusters:
-
+            self.logger.debug(f"Decoding aligned data for cluster {cluster_id}")
             data_aligned = self.align_algorithm.decode(
                 os.path.join(self.output_path, f"output.{cluster_id}.clustal_num")
             )
@@ -165,6 +167,85 @@ class Marissa:
                 self.df = self.df[self.df["cluster"] != cluster_id]
                 continue
             self.df.loc[self.df["cluster"] == cluster_id, "aligned"] = data_aligned
+
+    def get_fields(self):
+        """Get fields for each cluster."""
+        self.logger.info("Getting fields for each cluster")
+
+        if "fields" not in self.df.columns:
+            self.df["fields"] = None
+
+        for cluster_id, cluster_packets in self.df.groupby("cluster"):
+            self.logger.debug(f"Finding fields for cluster {cluster_id}")
+            fields = find_fields(cluster_packets["aligned"])
+            self.df.loc[self.df["cluster"] == cluster_id, "fields"] = self.df.loc[
+                self.df["cluster"] == cluster_id, "fields"
+            ].apply(lambda x: fields)
+
+    def merge_clusters(self):
+        """Merge clusters with the same static field."""
+        self.logger.info("Merging clusters with the same data")
+        need_realignment = False
+        for cluster_id, cluster_packets in self.df.groupby("cluster"):
+            if len(cluster_packets) == 1:
+                continue
+            fields = cluster_packets["fields"].iloc[0]
+            static_fields = [i for i in fields if i[2] == "S"]
+            if len(static_fields) == 0:
+                continue
+            else:
+                static_field = static_fields[0]
+
+            length = min(6, static_field[1])
+            static_field_content = cluster_packets["aligned"].iloc[0][
+                static_field[0] : static_field[0] + length
+            ]
+
+            for other_cluster_id, other_cluster_packets in self.df.groupby("cluster"):
+                if other_cluster_id == cluster_id:
+                    continue
+                # check if the other cluster has the same static field
+                other_fields = other_cluster_packets["fields"].iloc[0]
+                other_static_fields = [i for i in other_fields if i[2] == "S"]
+                if len(other_static_fields) == 0:
+                    continue
+                else:
+                    other_static_field = other_static_fields[0]
+
+                other_static_field_content = other_cluster_packets["aligned"].iloc[0][
+                    other_static_field[0] : other_static_field[0]
+                    + other_static_field[1]
+                ]
+
+                length = min(length, other_static_field[1])
+
+                is_same_field = (
+                    static_field_content[0:length]
+                    == other_static_field_content[0:length]
+                )
+                if is_same_field:
+                    need_realignment = True
+                    self.df.loc[self.df["cluster"] == other_cluster_id, "cluster"] = [
+                        cluster_id
+                    ] * len(self.df.loc[self.df["cluster"] == other_cluster_id])
+
+        if need_realignment:
+            new_clusters = self.df["cluster"].unique()
+            for cluster_id in self.clusters:
+                if cluster_id not in new_clusters:
+                    remove_files(
+                        [
+                            os.path.join(self.output_path, f"input.{cluster_id}.fasta"),
+                            os.path.join(
+                                self.output_path, f"output.{cluster_id}.clustal_num"
+                            ),
+                        ]
+                    )
+            self.clusters = self.df["cluster"].unique()
+            self.df["id_cluster"] = self.df.groupby("cluster").cumcount()
+            self.logger.info(f"Merging done, {len(self.clusters)} clusters remain")
+            self.run()
+            self.post_run()
 
     def cleanup(self):
         """Cleanup the files"""
@@ -212,63 +293,10 @@ class Marissa:
         equals = self.print_align(cluster_packets["aligned"])
         f.write(f"{' '*(id_length+2)}{equals}\n")
         self.logger.debug(f"Finding fields for cluster {cluster_id}")
-        fields = self.find_fields(cluster_packets["aligned"])
-        f.write(f"{", ".join(map(lambda x: f"{int(x[0]/2)}{x[1]}", fields))}\n\n")
-
-    @staticmethod
-    def _has_even_bytes(fields) -> bool:
-        for i in fields:
-            if len(i) % 2 != 0:
-                return False
-        return True
-
-    @staticmethod
-    def _is_variable_field(fields) -> bool:
-        for i in fields:
-            if "-" in i:
-                return True
-        return False
-
-    def find_fields(self, packets: list[str]) -> list:
-        """Find fields in the packets.
-
-        Args:
-            packets (list[str]): List of packets
-
-        Returns:
-            list: List of fields
-        """
-        message_length = len(max(packets, key=len))
-        results_fields = []
-        i = 0
-        isLastStatic = False
-        while i < message_length:
-            offset = 2
-            while i + offset <= message_length:
-                field = [packet[i : i + offset] for packet in packets]
-                if not self._has_even_bytes(field):
-                    offset += 1
-                    continue
-                else:
-                    break
-            if not len(set(field)) == 1:
-                if self._is_variable_field(field):
-                    fields_info = [offset, "V"]
-                else:
-                    fields_info = [offset, "D"]
-                results_fields.append(fields_info)
-                isLastStatic = False
-            else:
-                if isLastStatic:
-                    results_fields[-1][0] += offset
-                else:
-                    fields_info = [offset, "S"]
-                    results_fields.append(fields_info)
-                isLastStatic = True
-
-            i += offset
-
-        return results_fields
+        fields = cluster_packets["fields"].iloc[0]
+        f.write(
+            f"{', '.join(map(lambda x: f'{int(x[0]/2)}-{int(x[1]/2)}{x[2]}', fields))}\n\n"
+        )
 
     def print_align(
         self,

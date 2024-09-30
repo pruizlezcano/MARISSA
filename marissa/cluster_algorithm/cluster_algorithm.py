@@ -1,3 +1,4 @@
+import os
 from abc import ABC, abstractmethod
 from typing import List
 
@@ -27,10 +28,12 @@ class ClusterAlgorithm(ABC):
             np.ndarray: Distance matrix.
         """
         self.logger.debug("Calculating distance matrix...")
-        distances = np.zeros((len(data), len(data)))
-        for i in range(len(data)):
-            for j in range(len(data)):
-                distances[i, j] = self.distance_algorithm.compare(data[i], data[j])
+        nodes = [self.distance_algorithm.calculate_node(i) for i in data]
+        distances = np.zeros((len(nodes), len(nodes)))
+        for i in range(len(nodes)):
+            for j in range(len(nodes)):
+                distances[i, j] = self.distance_algorithm.compare(nodes[i], nodes[j])
+
         return distances
 
     @abstractmethod
