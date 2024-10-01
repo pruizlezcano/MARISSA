@@ -10,6 +10,7 @@ from marissa import (
     KMeansAlgorithm,
     KMeansHierarchicalAlgorithm,
     MafftAlgorithm,
+    MafftTextAlgorithm,
     Marissa,
     MuscleAlgorithm,
     OpticsAlgorithm,
@@ -40,6 +41,7 @@ class Cluster_Types(str, Enum):
 
 class Align_Types(str, Enum):
     clustalo = "clustalo"
+    maffttext = "maffttext"
     mafft = "mafft"
     muscle = "muscle"
     famsa = "famsa"
@@ -135,6 +137,7 @@ def main(
     }[cluster_type]
     align_type = {
         Align_Types.mafft: MafftAlgorithm,
+        Align_Types.maffttext: MafftTextAlgorithm,
         Align_Types.clustalo: ClustaloAlgorithm,
         Align_Types.muscle: MuscleAlgorithm,
         Align_Types.famsa: FamsaAlgorithm,
