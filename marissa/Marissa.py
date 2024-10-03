@@ -1,4 +1,5 @@
 import os
+from typing import List
 
 import pandas as pd
 
@@ -28,6 +29,22 @@ class Marissa:
         group_by_ethernet: bool = False,
         remove_duplicates: bool = False,
     ):
+        """Initialize the Marissa class.
+
+        Args:
+            verbose (bool, optional): Print debug statements. Defaults to False.
+            packet_length (int, optional): Filter packets by given length. Defaults to None.
+            packet_length_variance (int, optional): Allowed variance in packet length for filtering. Defaults to None.
+            percent_equal (int, optional): Minimum percentage of packets that must be equal for clustering. Defaults to 1.
+            input_file (str, optional): Input .pcap file path. Defaults to None.
+            output (str, optional): Path of the directory to write the results to. Defaults to None.
+            remove_headers (bool, optional): Should remove the message headers. Defaults to False.
+            distance_algorithm (DistanceAlgorithm, optional): Algorithm to calculate distance between packets. Defaults to None.
+            cluster_algorithm (ClusterAlgorithm, optional): Algorithm to cluster packets. Defaults to None.
+            align_algorithm (AlignmentAlgorithm, optional): Algorithm to align packets. Defaults to None.
+            group_by_ethernet (bool, optional): Group packets by Ethernet header. Defaults to False.
+            remove_duplicates (bool, optional): Remove duplicate packets. Defaults to False.
+        """
         self.input_file = input_file
         self.output_path = output
         self.max_length: int
@@ -98,7 +115,7 @@ class Marissa:
         self.logger.info(f"{len(self.df)} packets remain after removing duplicates")
 
     def clusterize(self):
-        """Clusterize the data using KMeans"""
+        """Clusterize the messages."""
         self.logger.debug("Performing clustering...")
         if self.group_by_ethernet:
             # get groups of packets with the same ethernet header
@@ -133,7 +150,7 @@ class Marissa:
             )
 
     def run(self):
-        """Run the algorithm."""
+        """Run the MARISSA analysis."""
         self.encode_data()
         self.logger.info("Aligning data")
         for cluster_id in self.clusters:
@@ -270,7 +287,7 @@ class Marissa:
         )
 
     def save_results_to_file(self):
-        """Save results to a file."""
+        """Save results to a txt file"""
         self.logger.info("Saving results to file")
         with open(os.path.join(self.output_path, "output.txt"), "w") as f:
             f.write(
@@ -289,10 +306,10 @@ class Marissa:
                 self.write_cluster_data_to_file(f, cluster_id, cluster_packets)
 
     def write_cluster_data_to_file(self, f, cluster_id, cluster_packets):
-        """Write data for a specific cluster to a file."""
+        """Write data for a specific cluster to a file"""
         f.write(f"CLUSTER {cluster_id}:\n")
         id_length = max(len(str(x)) for x in cluster_packets["id_cluster"])
-        for i, packet in cluster_packets.iterrows():
+        for _, packet in cluster_packets.iterrows():  # Changed 'i' to '_'
             f.write(
                 f"{str(packet['id_cluster']).zfill(id_length)}: {packet['aligned']}\n"
             )
@@ -306,8 +323,16 @@ class Marissa:
 
     def print_align(
         self,
-        packets: list[str],
+        packets: List[str],
     ) -> str:
+        """Print alignment of packets.
+
+        Args:
+            packets (List[str]): List of aligned packets.
+
+        Returns:
+            str: String representing the alignment.
+        """
         equals = ""
         for i in range(len(max(packets, key=len))):
             chars = [packet[i] for packet in packets if i < len(packet)]

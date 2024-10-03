@@ -9,8 +9,18 @@ logging.getLogger("scapy").setLevel(logging.CRITICAL)
 
 
 class Pcap:
+    """Pcap class to handle pcap files."""
+
     @staticmethod
     def load(filename: str) -> List[Packet]:
+        """Load a pcap file.
+
+        Args:
+            filename (str): Path to the pcap file.
+
+        Returns:
+            List[Packet]: List of packets in the pcap file.
+        """
         content = []
         with open(filename, "rb") as f:
             pcap = scapy.rdpcap(f)
@@ -20,6 +30,12 @@ class Pcap:
         return content
 
     @staticmethod
-    def write(packets: list[str], filename: str) -> None:
+    def write(packets: List[str], filename: str) -> None:
+        """Write packets to a pcap file.
+
+        Args:
+            packets (List[str]): List of the hexadecimal representation of the packets
+            filename (str): Path to the pcap file
+        """
         packets = [bytes.fromhex(packet) for packet in packets]
         scapy.wrpcap(filename, packets)

@@ -1,4 +1,5 @@
 import os
+from typing import List
 
 from marissa.alignment_algorithm import AlignmentAlgorithm
 
@@ -8,13 +9,13 @@ class MafftTextAlgorithm(AlignmentAlgorithm):
     def __init__(self):
         super().__init__()
 
-    def encode(self, data, output_file: str) -> list[int]:
+    def encode(self, data, output_file: str) -> List[int]:
         with open(output_file, "w") as f:
             for i, item in enumerate(data):
                 f.write(f">MSG.{i:0{len(str(len(data)))}}\n")
                 f.write(f"{item}\n")
 
-    def decode(self, input_file: str) -> list[int]:
+    def decode(self, input_file: str) -> List[int]:
         data = self.read_file(os.path.abspath(input_file))
         packets = []
         packet = ""

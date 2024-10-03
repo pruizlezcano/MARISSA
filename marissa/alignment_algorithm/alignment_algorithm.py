@@ -20,21 +20,31 @@ conversion_table = {
 
 
 class AlignmentAlgorithm(ABC):
+    """Abstract class for alignment algorithms."""
+
     def __init__(self):
         self.logger = Logger()
 
     @staticmethod
-    def _to_dna_sequence(item) -> str:
+    def _to_dna_sequence(item: str) -> str:
+        """Convert an item to a DNA sequence.
+
+        Args:
+            item (str): Hexadecimal string to convert.
+
+        Returns:
+            str: DNA sequence.
+        """
         item = item.upper()
         for key, value in conversion_table.items():
             item = item.replace(key, value)
         return item
 
-    def encode(self, data, output_file: str) -> None:
+    def encode(self, data: List[str], output_file: str):
         """Encode the data to a file.
 
         Args:
-            data (list[str]): Data to encode.
+            data (List[str]): Data to encode.
             output_file (str): File to write the encoded data to.
         """
         with open(output_file, "w") as f:
@@ -46,6 +56,14 @@ class AlignmentAlgorithm(ABC):
 
     @staticmethod
     def _to_hex(dna: str) -> str:
+        """Convert a DNA sequence to hexadecimal.
+
+        Args:
+            dna (str): DNA sequence to convert.
+
+        Returns:
+            str: Hexadecimal string.
+        """
         dna = dna.upper()
         for key, value in conversion_table.items():
             dna = dna.replace(value, key)
@@ -58,7 +76,7 @@ class AlignmentAlgorithm(ABC):
             input_file (str): File to read the encoded data from.
 
         Returns:
-            list[str]: Decoded data.
+            List[str]: Decoded data.
         """
         # check if the file exists
         if not os.path.isfile(input_file):
@@ -91,6 +109,14 @@ class AlignmentAlgorithm(ABC):
         pass
 
     def read_file(self, filename: str) -> List[str]:
+        """Read a file
+
+        Args:
+            filename (str): Path to the file.
+
+        Returns:
+            List[str]: List of lines in the file.
+        """
         if os.path.isfile(filename):
             with open(filename, "r") as f:
                 return f.read().splitlines()
