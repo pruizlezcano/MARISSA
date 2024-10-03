@@ -150,7 +150,7 @@ def main(
     marissa_runner = Marissa(
         verbose=verbose,
         input_file=pcap,
-        output_file=os.path.join(results_path, "output.txt"),
+        output=results_path,
         packet_length=packet_length,
         packet_length_variance=packet_length_variance,
         percent_equal=percent_equal,

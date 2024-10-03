@@ -20,7 +20,7 @@ class Marissa:
         packet_length_variance: int = None,
         percent_equal: int = 1,
         input_file=None,
-        output_file=None,
+        output=None,
         remove_headers: bool = False,
         distance_algorithm: DistanceAlgorithm = None,
         cluster_algorithm: ClusterAlgorithm = None,
@@ -29,8 +29,7 @@ class Marissa:
         remove_duplicates: bool = False,
     ):
         self.input_file = input_file
-        self.output_file = output_file
-        self.output_path = os.path.dirname(output_file)
+        self.output_path = output
         self.max_length: int
         self.verbose = verbose
         self.packet_length = packet_length
@@ -39,7 +38,6 @@ class Marissa:
         self.remove_headers = remove_headers
         self.clusters: list[str]
         self.logger = Logger(verbose)
-        self.pcap = Pcap(input_file)
         self.distance_algorithm: DistanceAlgorithm = distance_algorithm()
         self.cluster_algorithm: ClusterAlgorithm = cluster_algorithm
         self.align_algorithm: AlignmentAlgorithm = align_algorithm()
@@ -64,7 +62,7 @@ class Marissa:
     def load_data(self):
         """Load data from input file and calculate necessary features."""
         self.logger.debug("Loading data from input file")
-        packets = self.pcap.load()
+        packets = Pcap.load(self.input_file)
         self.logger.info(f"Loaded {len(packets)} packets")
         self.df = pd.DataFrame([i for i in packets], columns=["raw"])
         self.df["hex"] = self.df["raw"].apply(str)
@@ -260,13 +258,21 @@ class Marissa:
 
     def save(self):
         """Save the results"""
+        # Rename the cluster ids to be sequential
+        self.df["cluster"] = pd.Categorical(self.df["cluster"]).codes
+        self.clusters = self.df["cluster"].unique()
         self.save_results_to_file()
         self.save_cluster_data_to_pcap()
+        self.df.to_csv(
+            os.path.join(self.output_path, "output.csv"),
+            index=False,
+            columns=["cluster", "id_cluster", "raw", "aligned", "fields"],
+        )
 
     def save_results_to_file(self):
         """Save results to a file."""
         self.logger.info("Saving results to file")
-        with open(self.output_file, "w") as f:
+        with open(os.path.join(self.output_path, "output.txt"), "w") as f:
             f.write(
                 f"File: {self.input_file} - Packets: {len(self.df)} - Max Length: {self.max_length}\n"
             )
@@ -317,7 +323,7 @@ class Marissa:
     def save_cluster_data_to_pcap(self):
         """Save data for each cluster to a pcap file."""
         for cluster_id in self.clusters:
-            self.pcap.write(
+            Pcap.write(
                 self.df.loc[self.df["cluster"] == cluster_id, "original"],
                 os.path.join(self.output_path, f"output.{cluster_id}.pcap"),
             )

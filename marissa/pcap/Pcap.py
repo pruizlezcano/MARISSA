@@ -9,21 +9,17 @@ logging.getLogger("scapy").setLevel(logging.CRITICAL)
 
 
 class Pcap:
-    def __init__(
-        self,
-        filename,
-    ):
-        self.filename = filename
-
-    def load(self) -> List[Packet]:
+    @staticmethod
+    def load(filename: str) -> List[Packet]:
         content = []
-        with open(self.filename, "rb") as f:
+        with open(filename, "rb") as f:
             pcap = scapy.rdpcap(f)
             for packet in pcap:
                 content.append(Packet(packet))
 
         return content
 
-    def write(self, packets: list[str], filename: str) -> None:
+    @staticmethod
+    def write(packets: list[str], filename: str) -> None:
         packets = [bytes.fromhex(packet) for packet in packets]
         scapy.wrpcap(filename, packets)
