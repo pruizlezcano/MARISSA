@@ -1,3 +1,4 @@
+import json
 import os
 from typing import List
 
@@ -61,6 +62,7 @@ class Marissa:
         self.group_by_ethernet = group_by_ethernet
         self.remove_duplicates = remove_duplicates
         self.df: pd.DataFrame
+        self.running_time: pd.Timedelta
 
     def prepare(self):
         """Prepare the data for the clustal test."""
@@ -285,6 +287,26 @@ class Marissa:
             index=False,
             columns=["cluster", "id_cluster", "raw", "aligned", "fields"],
         )
+        self.save_meta()
+
+    def save_meta(self):
+        """Save metadata to a json file"""
+        with open(os.path.join(self.output_path, "output.meta.json"), "w") as f:
+            json.dump(
+                {
+                    "file": os.path.abspath(self.input_file),
+                    "distance_algorithm": self.distance_algorithm.__class__.__name__,
+                    "cluster_algorithm": self.cluster_algorithm.__qualname__,
+                    "align_algorithm": self.align_algorithm.__class__.__name__,
+                    "clusters": len(self.clusters),
+                    "remove_headers": self.remove_headers,
+                    "remove_duplicates": self.remove_duplicates,
+                    "group_by_ethernet": self.group_by_ethernet,
+                    "running_time": self.running_time.total_seconds(),
+                },
+                f,
+                indent=4,
+            )
 
     def save_results_to_file(self):
         """Save results to a txt file"""
@@ -355,8 +377,11 @@ class Marissa:
 
     def execute(self):
         """Execute the entire process."""
+        start_time = pd.Timestamp.now()
         self.prepare()
         self.run()
         self.post_run()
+        end_time = pd.Timestamp.now()
+        self.running_time = end_time - start_time
         self.cleanup()
         self.save()
