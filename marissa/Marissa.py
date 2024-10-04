@@ -141,7 +141,6 @@ class Marissa:
         self.clusters = self.df["cluster"].unique()
         self.logger.info(f"Clustering done. Found {len(self.clusters)} clusters")
         self.df["id_cluster"] = self.df.groupby("cluster").cumcount()
-        # clusterizer.plot(self.df["cluster"])
 
     def encode_data(self):
         """Encode the data and save it to a file."""

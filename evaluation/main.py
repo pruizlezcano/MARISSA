@@ -18,10 +18,18 @@ def main(
         "-i",
         help="The results .csv file to read",
     ),
+    plot: bool = typer.Option(
+        False,
+        "--plot",
+        "-p",
+        help="Plot the results",
+    ),
 ):
 
     analyzer = ResultsEvaluator(resutls_file)
     analyzer.analyze()
+    if plot:
+        analyzer.plot()
 
 
 if __name__ == "__main__":
