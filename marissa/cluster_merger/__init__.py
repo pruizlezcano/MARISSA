@@ -1,0 +1,5 @@
+from .cluster_merger import ClusterMerger
+from .merge_by_calinski_harabasz import MergeByCalinskiHarabasz
+from .merge_by_davies_bouldin import MergeByDaviesBouldin
+from .merge_by_field import MergeByField
+from .merge_by_silhouette import MergeBySilhouette

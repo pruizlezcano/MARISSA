@@ -1,6 +1,5 @@
 from typing import List
 
-import matplotlib.pyplot as plt
 import numpy as np
 from kneed import KneeLocator
 from sklearn.cluster import KMeans

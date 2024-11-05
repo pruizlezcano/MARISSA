@@ -6,6 +6,8 @@ import pandas as pd
 
 from marissa.alignment_algorithm import AlignmentAlgorithm
 from marissa.cluster_algorithm import ClusterAlgorithm
+from marissa.cluster_merger import ClusterMerger
+from marissa.cluster_merger.merge_by_field import MergeByField
 from marissa.distance_metrics import DistanceAlgorithm
 from marissa.Logger import Logger
 from marissa.pcap import Pcap
@@ -26,6 +28,8 @@ class Marissa:
         remove_headers: bool = False,
         distance_algorithm: DistanceAlgorithm = None,
         cluster_algorithm: ClusterAlgorithm = None,
+        cluster_merger: ClusterMerger = None,
+        merge_threshold: float = None,
         align_algorithm: AlignmentAlgorithm = None,
         group_by_ethernet: bool = False,
         remove_duplicates: bool = False,
@@ -58,6 +62,8 @@ class Marissa:
         self.logger = Logger(verbose)
         self.distance_algorithm: DistanceAlgorithm = distance_algorithm()
         self.cluster_algorithm: ClusterAlgorithm = cluster_algorithm
+        self.merger_algorithm: ClusterMerger = cluster_merger
+        self.merge_threshold = merge_threshold
         self.align_algorithm: AlignmentAlgorithm = align_algorithm()
         self.group_by_ethernet = group_by_ethernet
         self.remove_duplicates = remove_duplicates
@@ -165,8 +171,37 @@ class Marissa:
     def post_run(self):
         """Post run actions"""
         self.decode_aligned_data()
-        self.get_fields()
-        self.merge_clusters()
+        if len(self.clusters) > 2 and self.merger_algorithm is not None:
+            if self.merger_algorithm == MergeByField:
+                self.get_fields()
+            if self.merger_algorithm == MergeByField:
+                merger_algorithm = self.merger_algorithm()
+            else:
+                merger_algorithm = self.merger_algorithm(
+                    self.cluster_algorithm, self.distance_algorithm
+                )
+            self.df, need_realignment = merger_algorithm.merge(
+                df=self.df, threshold=self.merge_threshold
+            )
+            if need_realignment:
+                new_clusters = self.df["cluster"].unique()
+                for cluster_id in self.clusters:
+                    if cluster_id not in new_clusters:
+                        remove_files(
+                            [
+                                os.path.join(
+                                    self.output_path, f"input.{cluster_id}.fasta"
+                                ),
+                                os.path.join(
+                                    self.output_path, f"output.{cluster_id}.clustal_num"
+                                ),
+                            ]
+                        )
+                self.clusters = self.df["cluster"].unique()
+                self.df["id_cluster"] = self.df.groupby("cluster").cumcount()
+                self.logger.info(f"Merging done, {len(self.clusters)} clusters remain")
+                self.run()
+                self.post_run()
 
     def decode_aligned_data(self):
         """Decode aligned data for each cluster."""
@@ -198,71 +233,6 @@ class Marissa:
                 self.df["cluster"] == cluster_id, "fields"
             ].apply(lambda x: fields)
 
-    def merge_clusters(self):
-        """Merge clusters with the same static field."""
-        self.logger.info("Merging clusters with the same data")
-        need_realignment = False
-        for cluster_id, cluster_packets in self.df.groupby("cluster"):
-            if len(cluster_packets) == 1:
-                continue
-            fields = cluster_packets["fields"].iloc[0]
-            static_fields = [i for i in fields if i[2] == "S"]
-            if len(static_fields) == 0:
-                continue
-            else:
-                static_field = static_fields[0]
-
-            length = min(6, static_field[1])
-            static_field_content = cluster_packets["aligned"].iloc[0][
-                static_field[0] : static_field[0] + length
-            ]
-
-            for other_cluster_id, other_cluster_packets in self.df.groupby("cluster"):
-                if other_cluster_id == cluster_id:
-                    continue
-                # check if the other cluster has the same static field
-                other_fields = other_cluster_packets["fields"].iloc[0]
-                other_static_fields = [i for i in other_fields if i[2] == "S"]
-                if len(other_static_fields) == 0:
-                    continue
-                else:
-                    other_static_field = other_static_fields[0]
-
-                other_static_field_content = other_cluster_packets["aligned"].iloc[0][
-                    other_static_field[0] : other_static_field[0]
-                    + other_static_field[1]
-                ]
-
-                length = min(length, other_static_field[1])
-
-                is_same_field = (
-                    static_field_content[0:length]
-                    == other_static_field_content[0:length]
-                )
-                if is_same_field:
-                    need_realignment = True
-                    self.df.loc[self.df["cluster"] == other_cluster_id, "cluster"] = [
-                        cluster_id
-                    ] * len(self.df.loc[self.df["cluster"] == other_cluster_id])
-
-        if need_realignment:
-            new_clusters = self.df["cluster"].unique()
-            for cluster_id in self.clusters:
-                if cluster_id not in new_clusters:
-                    remove_files(
-                        [
-                            os.path.join(self.output_path, f"input.{cluster_id}.fasta"),
-                            os.path.join(
-                                self.output_path, f"output.{cluster_id}.clustal_num"
-                            ),
-                        ]
-                    )
-            self.clusters = self.df["cluster"].unique()
-            self.df["id_cluster"] = self.df.groupby("cluster").cumcount()
-            self.logger.info(f"Merging done, {len(self.clusters)} clusters remain")
-            self.run()
-            self.post_run()
-
     def cleanup(self):
         """Cleanup the files"""
         self.logger.debug("Cleaning up files")
@@ -277,8 +247,9 @@ class Marissa:
     def save(self):
         """Save the results"""
         # Rename the cluster ids to be sequential
-        self.df["cluster"] = pd.Categorical(self.df["cluster"]).codes
+        # self.df["cluster"] = pd.Categorical(self.df["cluster"]).codes
         self.clusters = self.df["cluster"].unique()
+        self.get_fields()
         self.save_results_to_file()
         self.save_cluster_data_to_pcap()
         self.df.to_csv(
@@ -297,7 +268,10 @@ class Marissa:
                     "distance_algorithm": self.distance_algorithm.__class__.__name__,
                     "cluster_algorithm": self.cluster_algorithm.__qualname__,
                     "align_algorithm": self.align_algorithm.__class__.__name__,
+                    "merge_algorithm": self.merger_algorithm.__qualname__,
+                    "merge_threshold": self.merge_threshold,
                     "clusters": len(self.clusters),
+                    "packet_count": len(self.df),
                     "remove_headers": self.remove_headers,
                     "remove_duplicates": self.remove_duplicates,
                     "group_by_ethernet": self.group_by_ethernet,
