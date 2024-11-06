@@ -135,6 +135,12 @@ def main(
         "--remove-duplicates",
         help="Remove duplicate packets before clustering.",
     ),
+    slice_packet: int = typer.Option(
+        None,
+        "--slice-packet",
+        "-s",
+        help="Remove the first x characters of the packet.",
+    ),
     merge_type: Merge_Types = typer.Option(
         None,
         "--merge-type",
@@ -185,6 +191,8 @@ def main(
     results_path = f"./results/{pcap_name}" if output is None else output
     os.makedirs(results_path, exist_ok=True)
 
+    slice_packet = None if slice_packet is None else slice_packet * 2
+
     marissa_runner = Marissa(
         verbose=verbose,
         input_file=pcap,
@@ -200,6 +208,7 @@ def main(
         align_algorithm=align_type,
         group_by_ethernet=group_by_ethernet,
         remove_duplicates=remove_duplicates,
+        slice_packet=slice_packet,
     )
     marissa_runner.execute()
 

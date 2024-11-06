@@ -33,6 +33,7 @@ class Marissa:
         align_algorithm: AlignmentAlgorithm = None,
         group_by_ethernet: bool = False,
         remove_duplicates: bool = False,
+        slice_packet: int = None,
     ):
         """Initialize the Marissa class.
 
@@ -67,6 +68,7 @@ class Marissa:
         self.align_algorithm: AlignmentAlgorithm = align_algorithm()
         self.group_by_ethernet = group_by_ethernet
         self.remove_duplicates = remove_duplicates
+        self.slice_packet = slice_packet
         self.df: pd.DataFrame
         self.running_time: pd.Timedelta
 
@@ -81,6 +83,8 @@ class Marissa:
         if self.remove_duplicates:
             self.remove_duplicate_packets()
         self.df = self.df.dropna()
+        if self.slice_packet is not None:
+            self.df["hex"] = self.df["hex"].apply(lambda x: x[self.slice_packet :])
         self.max_length = max(self.df["length"])
         self.clusterize()
 
@@ -144,6 +148,7 @@ class Marissa:
                 map(lambda x: f"{x}", clusterizer.perform_clustering())
             )
 
+        self.df = self.df[~self.df["cluster"].str.contains("-1")]
         self.clusters = self.df["cluster"].unique()
         self.logger.info(f"Clustering done. Found {len(self.clusters)} clusters")
         self.df["id_cluster"] = self.df.groupby("cluster").cumcount()
@@ -275,6 +280,7 @@ class Marissa:
                     "remove_headers": self.remove_headers,
                     "remove_duplicates": self.remove_duplicates,
                     "group_by_ethernet": self.group_by_ethernet,
+                    "slice_packet": self.slice_packet,
                     "running_time": self.running_time.total_seconds(),
                 },
                 f,
