@@ -8,7 +8,7 @@ packages = [{include = "marissa"}]
 
 [tool.poetry.scripts]
 marissa = "marissa.main:app"
-evaluate = "evaluation.main:app"
+evaluate = "evaluation.main:main"
 
 [tool.poetry.dependencies]
 python = "^3.9"
