@@ -24,10 +24,18 @@ class Packet:
         """
         layers = self._get_packet_layers()
 
-        if layers[2].name == "TCP" or layers[2].name == "UDP":
-            return binascii.hexlify(bytes(layers[3])).decode("utf-8")
-        else:
-            return binascii.hexlify(bytes(layers[2])).decode("utf-8")
+        app_layer = 2
+
+        if layers[1].name == "802.1Q":
+            app_layer += 1
+
+        if app_layer >= len(layers):
+            app_layer = len(layers) - 1
+
+        if layers[app_layer].name == "TCP" or layers[app_layer].name == "UDP":
+            app_layer += 1
+
+        return binascii.hexlify(bytes(layers[app_layer])).decode("utf-8")
 
     def _get_packet_layers(self) -> List[ScapyPacket]:
         """Get the layers of the packet.
