@@ -154,6 +154,12 @@ def main(
         "-t",
         help="The threshold to merge the clusters. Required if merge-type is not 'field'.",
     ),
+    ignore_noise: bool = typer.Option(
+        False,
+        "--ignore-noise",
+        "-n",
+        help="Ignore noise points (cluster -1) in the results.",
+    ),
 ):
     if (
         merge_type is not None
@@ -209,6 +215,7 @@ def main(
         group_by_ethernet=group_by_ethernet,
         remove_duplicates=remove_duplicates,
         slice_packet=slice_packet,
+        ignore_noise=ignore_noise,
     )
     marissa_runner.execute()
 

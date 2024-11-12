@@ -34,6 +34,7 @@ class Marissa:
         group_by_ethernet: bool = False,
         remove_duplicates: bool = False,
         slice_packet: int = None,
+        ignore_noise: bool = False,
     ):
         """Initialize the Marissa class.
 
@@ -69,6 +70,7 @@ class Marissa:
         self.group_by_ethernet = group_by_ethernet
         self.remove_duplicates = remove_duplicates
         self.slice_packet = slice_packet
+        self.ignore_noise = ignore_noise
         self.df: pd.DataFrame
         self.running_time: pd.Timedelta
 
@@ -148,7 +150,8 @@ class Marissa:
                 map(lambda x: f"{x}", clusterizer.perform_clustering())
             )
 
-        self.df = self.df[~self.df["cluster"].str.contains("-1")]
+        if self.ignore_noise:
+            self.df = self.df[~self.df["cluster"].str.contains("-1")]
         self.clusters = self.df["cluster"].unique()
         self.logger.info(f"Clustering done. Found {len(self.clusters)} clusters")
         self.df["id_cluster"] = self.df.groupby("cluster").cumcount()
@@ -281,6 +284,7 @@ class Marissa:
                     "remove_duplicates": self.remove_duplicates,
                     "group_by_ethernet": self.group_by_ethernet,
                     "slice_packet": self.slice_packet,
+                    "ignore_noise": self.ignore_noise,
                     "running_time": self.running_time.total_seconds(),
                 },
                 f,
