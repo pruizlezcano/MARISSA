@@ -77,7 +77,6 @@ class Marissa:
     def prepare(self):
         """Prepare the data for the clustal test."""
         self.load_data()
-        self.df = self.df.head(1000)
         if self.packet_length is not None:
             self.filter_data_by_packet_length()
         if self.remove_headers:
