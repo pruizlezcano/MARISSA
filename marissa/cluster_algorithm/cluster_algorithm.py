@@ -30,11 +30,19 @@ class ClusterAlgorithm(ABC):
             np.ndarray: Distance matrix.
         """
         self.logger.debug("Calculating distance matrix...")
+
+        # Pre-calculate nodes once
         nodes = [self.distance_algorithm.calculate_node(i) for i in data]
-        distances = np.zeros((len(nodes), len(nodes)))
-        for i in range(len(nodes)):
-            for j in range(len(nodes)):
-                distances[i, j] = self.distance_algorithm.compare(nodes[i], nodes[j])
+        n = len(nodes)
+        distances = np.zeros((n, n))
+
+        # Only calculate upper triangle since distance matrix is usually symmetric
+        for i in range(n):
+            # Diagonal is usually 0 for distance metrics
+            for j in range(i + 1, n):
+                distance = self.distance_algorithm.compare(nodes[i], nodes[j])
+                distances[i, j] = distance
+                distances[j, i] = distance  # Mirror the value
 
         return distances
 
