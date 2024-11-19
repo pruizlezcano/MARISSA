@@ -129,7 +129,7 @@ class Marissa:
 
     def clusterize(self):
         """Clusterize the messages."""
-        self.logger.debug("Performing clustering...")
+        self.logger.info("Performing clustering...")
         if self.group_by_ethernet:
             # get groups of packets with the same ethernet header
             self.df["group"] = self.df.groupby("ethernet").ngroup()
@@ -254,7 +254,7 @@ class Marissa:
     def save(self):
         """Save the results"""
         # Rename the cluster ids to be sequential
-        # self.df["cluster"] = pd.Categorical(self.df["cluster"]).codes
+        self.df["cluster"] = pd.Categorical(self.df["cluster"]).codes
         self.clusters = self.df["cluster"].unique()
         self.get_fields()
         self.save_results_to_file()

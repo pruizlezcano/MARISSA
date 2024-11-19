@@ -28,7 +28,7 @@ class Singleton(type):
 
 class Logger(metaclass=Singleton):
     def __init__(self, verbose=False):
-        self.logger = logging.getLogger("clustal")
+        self.logger = logging.getLogger("MARISSA")
         handler = logging.StreamHandler()
         formatter = ColoredFormatter(
             "%(asctime)s [%(name)s] %(levelname)s: %(message)s"
