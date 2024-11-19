@@ -51,7 +51,8 @@ def run_marissa(
     )
     marissa.execute()
     analyzer = ResultsEvaluator(f"{output}/output.csv")
-    cluster_stats = analyzer.analyze_clusters()
+    logger.info(f"Analyzing results")
+    cluster_stats, fields_stats = analyzer.analyze()
 
     # Read number of clusters and running time from meta.json
     with open(f"{output}/output.meta.json", "r") as f:
@@ -59,7 +60,7 @@ def run_marissa(
         cluster_stats["n_clusters"] = meta["clusters"]
         cluster_stats["running_time"] = meta["running_time"]
 
-    return cluster_stats
+    return cluster_stats, fields_stats
 
 
 def process_pcap(
@@ -106,7 +107,7 @@ def process_pcap(
                     )
                     os.makedirs(output_dir, exist_ok=True)
 
-                    cluster_stats = run_marissa(
+                    cluster_stats, fields_stats = run_marissa(
                         input_data["pcap"],
                         alignment,
                         cluster_merge,
@@ -132,6 +133,7 @@ def process_pcap(
                             "merge_threshold": merge_threshold,
                             "ignore_noise": ignore_noise,
                             "cluster_stats": cluster_stats,
+                            "fields_stats": fields_stats,
                         }
                     )
                     runs += 1
@@ -144,7 +146,7 @@ def process_pcap(
     )
     csv_path = os.path.join(base_output_dir, f"{pcap_name}_results.csv")
     df.to_csv(csv_path)
-
+    logger.info(f"Saved results to {csv_path}")
     return df
 
 
@@ -156,12 +158,12 @@ def main():
         #     "group_by_ethernet": False,
         #     "remove_duplicates": True,
         # },
-        {
-            "pcap": "input/ftp.pcap",
-            "remove_headers": True,
-            "group_by_ethernet": False,
-            "remove_duplicates": True,
-        },
+        # {
+        #     "pcap": "input/ftp.pcap",
+        #     "remove_headers": True,
+        #     "group_by_ethernet": False,
+        #     "remove_duplicates": True,
+        # },
         # {
         #     "pcap": "input/ntp_1000.pcap",
         #     "remove_headers": True,
@@ -169,7 +171,7 @@ def main():
         #     "remove_duplicates": True,
         # },
         {
-            "pcap": "input/dns.pcap",
+            "pcap": "input/dns_1000.pcap",
             "remove_headers": True,
             "group_by_ethernet": True,
             "remove_duplicates": True,
@@ -189,7 +191,7 @@ def main():
         MergeByCalinskiHarabasz,
         MergeByDaviesBouldin,
     ]
-    merge_thresholds = [x / 10.0 for x in range(1, 110, 1)]
+    merge_thresholds = [x / 10.0 for x in range(0, 100, 5)]
 
     total_runs = (
         len(alignment_algorithms)
@@ -198,19 +200,17 @@ def main():
             for cm in cluster_merge_algorithms
         )
         * 2  # ignore_noise=True and False
+        * len(inputs)
     )
 
-    # Process each PCAP independently
-    all_results = []
     for input_data in inputs:
-        df = process_pcap(
+        process_pcap(
             input_data,
             alignment_algorithms,
             cluster_merge_algorithms,
             merge_thresholds,
             total_runs,
         )
-        all_results.append(df)
 
 
 if __name__ == "__main__":

@@ -166,16 +166,15 @@ class ResultsEvaluator:
 
         return true_fields
 
-    def analyze(self):
-        self.analyze_clusters()
-        self.analyze_fields()
-
-    def analyze_clusters(self) -> dict:
+    def analyze(self) -> Tuple[dict, dict]:
         os.makedirs("temp", exist_ok=True)
+        cluster_stats = self._analyze_clusters()
+        fields_stats = self._analyze_fields()
+        # remove temp folder
 
-        console.print(self.meta)
+        return cluster_stats, fields_stats
 
-        console.print("[+] Checking intra-cluster message types", style="bold blue")
+    def _analyze_clusters(self) -> dict:
         for cluster in self.df["cluster"].unique():
             cluster_packets = self.df[self.df["cluster"] == cluster]["raw"].tolist()
 
@@ -200,49 +199,6 @@ class ResultsEvaluator:
                 "message_type"
             ].unique()
 
-            if len(message_types) > 1:
-                console.print(
-                    f"Cluster {cluster} has {len(message_types)} different types of messages: {message_types}",
-                    style="bold red",
-                )
-            else:
-                console.print(
-                    f"Cluster {cluster} OK: {message_types}",
-                    style="bold green",
-                )
-
-        console.print("[+] Checking inter-cluster message types", style="bold blue")
-        cluster_ids = self.df["cluster"].unique()
-        all_different = True
-
-        for i, cluster_id in enumerate(cluster_ids):
-            for j in range(i + 1, len(cluster_ids)):
-                other_cluster_id = cluster_ids[j]
-                if set(
-                    self.df[self.df["cluster"] == cluster_id]["message_type"]
-                ) == set(
-                    self.df[self.df["cluster"] == other_cluster_id]["message_type"]
-                ):
-                    all_different = False
-                    console.print(
-                        f"Cluster {cluster_id} and Cluster {other_cluster_id} have the same message types: {set(self.df[self.df['cluster'] == cluster_id]['message_type'])}",
-                        style="bold yellow",
-                    )
-
-        if all_different:
-            console.print(
-                "All clusters have different message types", style="bold green"
-            )
-
-        console.print("[+] Message types", style="bold blue")
-        console.print(
-            f"Client message types: {len(self.client_message_types)} {self.client_message_types}"
-        )
-        console.print(
-            f"Server message types: {len(self.server_message_types)} {self.server_message_types}"
-        )
-
-        console.print("[+] Cluster Metrics", style="bold blue")
         # get true labels from message types
         type_to_labels = {}
         message_types = self.df["message_type"].unique()
@@ -271,15 +227,12 @@ class ResultsEvaluator:
                 predicted_labels, true_labels
             ),
         }
-        console.print(stats)
         return stats
 
-    def analyze_fields(self) -> dict:
+    def _analyze_fields(self) -> dict:
         console.print("[+] Checking fields", style="bold blue")
         stats = {}
         for cluster in self.df["cluster"].unique():
-            print("====================")
-            console.print(f"Cluster {cluster}")
             cluster_packets = self.df[self.df["cluster"] == cluster]["tshark"].tolist()
             true_fields = self.get_true_fields(cluster_packets)
             inferred_fileds = self.df[self.df["cluster"] == cluster]["fields"].tolist()[
@@ -292,10 +245,6 @@ class ResultsEvaluator:
             plain_true_fields = ""
             for field in true_fields:
                 plain_true_fields += field[2] * field[1]
-
-            print("====================")
-            print("-", plain_inferred_fields)
-            print("+", plain_true_fields)
 
             # same length
             if len(plain_inferred_fields) < len(plain_true_fields):
@@ -340,6 +289,4 @@ class ResultsEvaluator:
                 ),
             }
             stats[cluster] = cluster_stats
-            console.print(cluster_stats)
-            print("====================")
         return stats
