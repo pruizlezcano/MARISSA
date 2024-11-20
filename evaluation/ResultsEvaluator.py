@@ -170,7 +170,7 @@ class ResultsEvaluator:
         os.makedirs("temp", exist_ok=True)
         cluster_stats = self._analyze_clusters()
         fields_stats = self._analyze_fields()
-        # remove temp folder
+        shutil.rmtree("temp")
 
         return cluster_stats, fields_stats
 
@@ -230,7 +230,6 @@ class ResultsEvaluator:
         return stats
 
     def _analyze_fields(self) -> dict:
-        console.print("[+] Checking fields", style="bold blue")
         stats = {}
         for cluster in self.df["cluster"].unique():
             cluster_packets = self.df[self.df["cluster"] == cluster]["tshark"].tolist()

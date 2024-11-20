@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import shutil
 import time
 from datetime import timedelta
 
@@ -10,6 +11,7 @@ from evaluation import ResultsEvaluator
 from marissa import (
     ClustaloAlgorithm,
     FamsaAlgorithm,
+    Logger,
     MafftAlgorithm,
     MafftTextAlgorithm,
     Marissa,
@@ -23,13 +25,7 @@ from marissa import (
     SSDEEPDistance,
 )
 
-# Configure logging
-logging.basicConfig(
-    filename="process.log",
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-)
-logger = logging.getLogger()
+logger = Logger()
 
 
 def run_marissa(
@@ -51,7 +47,7 @@ def run_marissa(
     )
     marissa.execute()
     analyzer = ResultsEvaluator(f"{output}/output.csv")
-    logger.info(f"Analyzing results")
+    logger.info(f"[+] Analyzing results")
     cluster_stats, fields_stats = analyzer.analyze()
 
     # Read number of clusters and running time from meta.json
@@ -115,6 +111,7 @@ def process_pcap(
                         output_dir,
                         ignore_noise=ignore_noise,
                     )
+                    shutil.rmtree(output_dir)
 
                     # Update average time per run
                     run_time = time.time() - run_start
@@ -141,12 +138,12 @@ def process_pcap(
     # Create and save DataFrame for this PCAP
     df = pd.DataFrame(stats)
     df.set_index(
-        ["pcap_name", "alignment", "cluster_merge", "merge_threshold", "ignore_noise"],
+        ["alignment", "cluster_merge", "merge_threshold", "ignore_noise"],
         inplace=True,
     )
     csv_path = os.path.join(base_output_dir, f"{pcap_name}_results.csv")
     df.to_csv(csv_path)
-    logger.info(f"Saved results to {csv_path}")
+    logger.info(f"[+] Saved results to {csv_path}")
     return df
 
 
