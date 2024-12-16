@@ -64,7 +64,6 @@ def process_pcap(
     alignment_algorithms,
     cluster_merge_algorithms,
     merge_thresholds,
-    total_runs,
 ):
     pcap_name = os.path.basename(input_data["pcap"])
     base_output_dir = f"./results/{pcap_name}"
@@ -74,6 +73,14 @@ def process_pcap(
     runs = 1
     start_time = time.time()
     avg_time_per_run = None
+    total_runs = (
+        len(alignment_algorithms)
+        * sum(
+            len(merge_thresholds) if cm != MergeByField else 1
+            for cm in cluster_merge_algorithms
+        )
+        * 2
+    )  # ignore_noise=True and False
 
     for alignment in alignment_algorithms:
         for cluster_merge in cluster_merge_algorithms:
@@ -190,23 +197,12 @@ def main():
     ]
     merge_thresholds = [x / 10.0 for x in range(0, 100, 5)]
 
-    total_runs = (
-        len(alignment_algorithms)
-        * sum(
-            len(merge_thresholds) if cm != MergeByField else 1
-            for cm in cluster_merge_algorithms
-        )
-        * 2  # ignore_noise=True and False
-        * len(inputs)
-    )
-
     for input_data in inputs:
         process_pcap(
             input_data,
             alignment_algorithms,
             cluster_merge_algorithms,
             merge_thresholds,
-            total_runs,
         )
 
 

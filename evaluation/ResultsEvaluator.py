@@ -1,5 +1,8 @@
 import json
 import os
+import shutil
+import sys
+from typing import List, Tuple
 
 import pandas as pd
 from rich.console import Console
@@ -289,3 +292,14 @@ class ResultsEvaluator:
             }
             stats[cluster] = cluster_stats
         return stats
+
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print("Usage: python ResultsEvaluator.py <results_file>")
+        sys.exit(1)
+    if not os.path.exists(sys.argv[1]):
+        print(f"File {sys.argv[1]} does not exist")
+    evaluator = ResultsEvaluator(sys.argv[1])
+    stats, _ = evaluator.analyze()
+    print(stats)
