@@ -48,9 +48,13 @@ class Marissa:
             remove_headers (bool, optional): Should remove the message headers. Defaults to False.
             distance_algorithm (DistanceAlgorithm, optional): Algorithm to calculate distance between packets. Defaults to None.
             cluster_algorithm (ClusterAlgorithm, optional): Algorithm to cluster packets. Defaults to None.
+            cluster_merger (ClusterMerger, optional): Algorithm to merge clusters. Defaults to None.
+            merge_threshold (float, optional): Threshold for merging clusters. Defaults to None.
             align_algorithm (AlignmentAlgorithm, optional): Algorithm to align packets. Defaults to None.
             group_by_ethernet (bool, optional): Group packets by Ethernet header. Defaults to False.
             remove_duplicates (bool, optional): Remove duplicate packets. Defaults to False.
+            slice_packet (int, optional): Slice the packet at the given index. Defaults to None.
+            ignore_noise (bool, optional): Ignore noise in the clusters (cluster -1). Defaults to False.
         """
         self.input_file = input_file
         self.output_path = output
@@ -75,22 +79,21 @@ class Marissa:
         self.running_time: pd.Timedelta
 
     def prepare(self):
-        """Prepare the data for the clustal test."""
-        self.load_data()
+        """Prepare the data for clustering."""
+        self.load_packets()
         if self.packet_length is not None:
-            self.filter_data_by_packet_length()
+            self.filter_packets_by_length()
         if self.remove_headers:
-            self.remove_header()
+            self.strip_headers()
         if self.remove_duplicates:
             self.remove_duplicate_packets()
         self.df = self.df.dropna()
         if self.slice_packet is not None:
             self.df["hex"] = self.df["hex"].apply(lambda x: x[self.slice_packet :])
         self.max_length = max(self.df["length"])
-        self.clusterize()
 
-    def load_data(self):
-        """Load data from input file and calculate necessary features."""
+    def load_packets(self):
+        """Load packets from the input file and calculate necessary features."""
         self.logger.debug("Loading data from input file")
         packets = Pcap.load(self.input_file)
         self.logger.info(f"Loaded {len(packets)} packets")
@@ -102,8 +105,8 @@ class Marissa:
         if self.group_by_ethernet:
             self.df["ethernet"] = self.df["hex"].apply(lambda x: x[:24])
 
-    def filter_data_by_packet_length(self):
-        """Filter data by packet length if packet_length is specified."""
+    def filter_packets_by_length(self):
+        """Filter packets by specified length."""
         self.logger.debug("Filtering data by packet length")
         if self.packet_length is not None:
             self.df = self.df[
@@ -115,26 +118,27 @@ class Marissa:
             ]
         self.logger.info(f"{len(self.df)} packets remain after filtering by length")
 
-    def remove_header(self):
-        """Add header length to raw data if header_length is specified."""
+    def strip_headers(self):
+        """Remove headers from packets."""
         self.logger.debug("Removing headers from data")
         self.df["hex"] = [x.get_applayer() for x in self.df["raw"]]
 
     def remove_duplicate_packets(self):
-        """Remove duplicate packets from the data."""
+        """Remove duplicate packets."""
         self.logger.debug("Removing duplicate packets")
         self.df = self.df.drop_duplicates("hex")
         self.df = self.df.reset_index(drop=True)
         self.logger.info(f"{len(self.df)} packets remain after removing duplicates")
 
-    def clusterize(self):
-        """Clusterize the messages."""
+    def perform_clustering(self):
+        """Cluster the packets."""
         self.logger.info("Performing clustering...")
         if self.group_by_ethernet:
             # get groups of packets with the same ethernet header
             self.df["group"] = self.df.groupby("ethernet").ngroup()
-
             for group_id, group_packets in self.df.groupby("group"):
+                if len(group_packets) < 2:
+                    continue
                 clusterizer = self.cluster_algorithm(
                     group_packets["hex"], self.distance_algorithm
                 )
@@ -155,17 +159,17 @@ class Marissa:
         self.logger.info(f"Clustering done. Found {len(self.clusters)} clusters")
         self.df["id_cluster"] = self.df.groupby("cluster").cumcount()
 
-    def encode_data(self):
-        """Encode the data and save it to a file."""
+    def encode_packets(self):
+        """Encode the packets and save them to files."""
         for cluster_id, cluster_packets in self.df.groupby("cluster"):
             self.align_algorithm.encode(
                 cluster_packets["hex"],
                 os.path.join(self.output_path, f"input.{cluster_id}.fasta"),
             )
 
-    def run(self):
-        """Run the MARISSA analysis."""
-        self.encode_data()
+    def align_clusters(self):
+        """Align the clusters."""
+        self.encode_packets()
         self.logger.info("Aligning data")
         for cluster_id in self.clusters:
             self.logger.debug(f"Running aligment for cluster {cluster_id}")
@@ -175,13 +179,13 @@ class Marissa:
                 os.path.join(self.output_path, f"output.{cluster_id}.clustal_num"),
             )
 
-    def post_run(self):
-        """Post run actions"""
-        self.decode_aligned_data()
+    def merge_clusters(self):
+        """Merge clusters based on the specified merger algorithm."""
         if len(self.clusters) > 2 and self.merger_algorithm is not None:
             if self.merger_algorithm == MergeByField:
+                self.align_clusters()
+                self.decode_aligned_clusters()
                 self.get_fields()
-            if self.merger_algorithm == MergeByField:
                 merger_algorithm = self.merger_algorithm()
             else:
                 merger_algorithm = self.merger_algorithm(
@@ -207,10 +211,9 @@ class Marissa:
                 self.clusters = self.df["cluster"].unique()
                 self.df["id_cluster"] = self.df.groupby("cluster").cumcount()
                 self.logger.info(f"Merging done, {len(self.clusters)} clusters remain")
-                self.run()
-                self.post_run()
+                self.merge_clusters()
 
-    def decode_aligned_data(self):
+    def decode_aligned_clusters(self):
         """Decode aligned data for each cluster."""
         self.logger.info("Decoding aligned data")
         for cluster_id in self.clusters:
@@ -241,7 +244,7 @@ class Marissa:
             ].apply(lambda x: fields)
 
     def cleanup(self):
-        """Cleanup the files"""
+        """Clean up temporary files"""
         self.logger.debug("Cleaning up files")
         for cluster_id in self.clusters:
             remove_files(
@@ -251,7 +254,7 @@ class Marissa:
                 ]
             )
 
-    def save(self):
+    def save_results(self):
         """Save the results"""
         # Rename the cluster ids to be sequential
         self.df["cluster"] = pd.Categorical(self.df["cluster"]).codes
@@ -275,7 +278,11 @@ class Marissa:
                     "distance_algorithm": self.distance_algorithm.__class__.__name__,
                     "cluster_algorithm": self.cluster_algorithm.__qualname__,
                     "align_algorithm": self.align_algorithm.__class__.__name__,
-                    "merge_algorithm": self.merger_algorithm.__qualname__,
+                    "merge_algorithm": (
+                        self.merger_algorithm.__qualname__
+                        if self.merger_algorithm is not None
+                        else None
+                    ),
                     "merge_threshold": self.merge_threshold,
                     "clusters": len(self.clusters),
                     "packet_count": len(self.df),
@@ -310,7 +317,13 @@ class Marissa:
                 self.write_cluster_data_to_file(f, cluster_id, cluster_packets)
 
     def write_cluster_data_to_file(self, f, cluster_id, cluster_packets):
-        """Write data for a specific cluster to a file"""
+        """Write data for a specific cluster to a file.
+
+        Args:
+            f (file): File object to write to.
+            cluster_id (str): Cluster id.
+            cluster_packets (pd.DataFrame): Packets in the cluster.
+        """
         f.write(f"CLUSTER {cluster_id}:\n")
         id_length = max(len(str(x)) for x in cluster_packets["id_cluster"])
         for _, packet in cluster_packets.iterrows():  # Changed 'i' to '_'
@@ -361,9 +374,12 @@ class Marissa:
         """Execute the entire process."""
         start_time = pd.Timestamp.now()
         self.prepare()
-        self.run()
-        self.post_run()
+        self.perform_clustering()
+        self.merge_clusters()
+        if self.merger_algorithm is not MergeByField:
+            self.align_clusters()
+            self.decode_aligned_clusters()
         end_time = pd.Timestamp.now()
         self.running_time = end_time - start_time
         self.cleanup()
-        self.save()
+        self.save_results()
