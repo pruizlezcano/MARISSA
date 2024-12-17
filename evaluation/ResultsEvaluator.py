@@ -210,10 +210,15 @@ class ResultsEvaluator:
                 type_to_labels[message_type] = len(type_to_labels)
         true_labels = self.df["message_type"].map(type_to_labels)
 
-        predicted_labels = self.df["cluster"].unique()
-        predicted_labels = pd.Series(
-            [list(predicted_labels).index(i) for i in self.df["cluster"]]
-        )
+        for cluster in self.df["cluster"].unique():
+            cluster_packets = self.df[self.df["cluster"] == cluster]
+            cluster_types = cluster_packets["message_type"]
+            max_type = cluster_types.value_counts().idxmax()
+            self.df.loc[self.df["cluster"] == cluster, "predicted_message_type"] = (
+                type_to_labels[max_type]
+            )
+
+        predicted_labels = self.df["predicted_message_type"]
 
         stats = {
             "precision": precision_score(

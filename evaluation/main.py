@@ -29,7 +29,13 @@ logger = Logger()
 
 
 def run_marissa(
-    input_file, alignment, cluster_merge, merge_threshold, output, ignore_noise=False
+    input_file,
+    alignment,
+    cluster_merge,
+    merge_threshold,
+    output,
+    ignore_noise=False,
+    group_by_ethernet=False,
 ):
     marissa = Marissa(
         verbose=False,
@@ -41,7 +47,7 @@ def run_marissa(
         cluster_merger=cluster_merge,
         merge_threshold=merge_threshold,
         align_algorithm=alignment,
-        group_by_ethernet=False,
+        group_by_ethernet=group_by_ethernet,
         remove_duplicates=True,
         ignore_noise=ignore_noise,
     )
@@ -117,6 +123,7 @@ def process_pcap(
                         merge_threshold,
                         output_dir,
                         ignore_noise=ignore_noise,
+                        group_by_ethernet=input_data["group_by_ethernet"],
                     )
                     shutil.rmtree(output_dir)
 
