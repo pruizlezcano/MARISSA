@@ -26,10 +26,14 @@ class MergeByField(ClusterMerger):
             else:
                 static_field = static_fields[0]
 
-            length = min(6, static_field[1])
-            static_field_content = cluster_packets["aligned"].iloc[0][
-                static_field[0] : static_field[0] + length
-            ]
+            cluster_packets["static"] = cluster_packets["aligned"].apply(
+                lambda x: x[static_field[0] : static_field[0] + static_field[1]]
+            )
+
+            static_field_content = cluster_packets["static"].value_counts().idxmax()
+
+            if len(static_field_content) == 0:
+                static_field_content = cluster_packets["static"].value_counts().idxmax()
 
             for other_cluster_id, other_cluster_packets in df.groupby("cluster"):
                 if str(other_cluster_id) == str(cluster_id):
@@ -42,16 +46,25 @@ class MergeByField(ClusterMerger):
                 else:
                     other_static_field = other_static_fields[0]
 
-                other_static_field_content = other_cluster_packets["aligned"].iloc[0][
-                    other_static_field[0] : other_static_field[0]
-                    + other_static_field[1]
-                ]
+                other_cluster_packets["static"] = other_cluster_packets[
+                    "aligned"
+                ].apply(
+                    lambda x: x[
+                        other_static_field[0] : other_static_field[0]
+                        + other_static_field[1]
+                    ]
+                )
 
-                length = min(length, other_static_field[1])
+                other_static_field_content = (
+                    other_cluster_packets["static"].value_counts().idxmax()
+                )
+
+                length = min(static_field[1], other_static_field[1], 6)
 
                 is_same_field = (
                     static_field_content[0:length]
                     == other_static_field_content[0:length]
+                    and static_field[0] == other_static_field[0]
                 )
                 if is_same_field:
                     need_realignment = True
