@@ -36,7 +36,8 @@ class ResultsEvaluator:
     def remove_tshark_headers(self, packet: dict) -> dict:
         packet["_source"]["layers"].pop("frame")
         packet["_source"]["layers"].pop("eth")
-        packet["_source"]["layers"].pop("ip")
+        if "ip" in packet["_source"]["layers"]:
+            packet["_source"]["layers"].pop("ip")
         if "udp" in packet["_source"]["layers"]:
             packet["_source"]["layers"].pop("udp")
         if "tcp" in packet["_source"]["layers"]:
@@ -255,11 +256,11 @@ class ResultsEvaluator:
 
             # same length
             if len(plain_inferred_fields) < len(plain_true_fields):
-                plain_inferred_fields += "0" * (
+                plain_inferred_fields += "V" * (
                     len(plain_true_fields) - len(plain_inferred_fields)
                 )
             else:
-                plain_true_fields += "0" * (
+                plain_true_fields += "V" * (
                     len(plain_inferred_fields) - len(plain_true_fields)
                 )
 
@@ -306,5 +307,10 @@ if __name__ == "__main__":
     if not os.path.exists(sys.argv[1]):
         print(f"File {sys.argv[1]} does not exist")
     evaluator = ResultsEvaluator(sys.argv[1])
-    stats, _ = evaluator.analyze()
-    print(stats)
+    cluster_stats, fields_stats = evaluator.analyze()
+    print(cluster_stats)
+    print("Cluster statistics:")
+    stats_df = pd.DataFrame(fields_stats).T
+    stats_mean = stats_df.mean()
+    print("Mean fields statistics:")
+    print(stats_mean.to_dict())
