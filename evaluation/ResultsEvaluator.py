@@ -5,7 +5,6 @@ import sys
 from typing import List, Tuple
 
 import pandas as pd
-from rich.console import Console
 from scapy.all import *
 from sklearn.metrics import (
     accuracy_score,
@@ -22,13 +21,9 @@ from sklearn.metrics import (
 from evaluation.utils import run_tshark
 from marissa import Pcap
 
-console = Console()
-
 
 class ResultsEvaluator:
     def __init__(self, results_file_input: str) -> None:
-        self.client_message_types = set()
-        self.server_message_types = set()
         self.df = pd.read_csv(results_file_input)
         with open(results_file_input.replace(".csv", ".meta.json")) as f:
             self.meta = json.load(f)
@@ -51,10 +46,6 @@ class ResultsEvaluator:
         if "dns" in layers:
             res = "DNS-"
             flags = layers["dns"]["dns.flags"]
-            if int(flags, 0) & 0x8000:
-                self.server_message_types.add(flags)
-            else:
-                self.client_message_types.add(flags)
             message_type = res + str(flags)
             return message_type
         elif "ftp" in layers:
@@ -62,29 +53,17 @@ class ResultsEvaluator:
             res += "-Q-" if layers["ftp"]["ftp.request"] == "1" else "-R-"
             ftp_command = list(layers["ftp"].keys())[2]
             if "ftp.request.command" in layers["ftp"][ftp_command]:
-                self.client_message_types.add(
-                    layers["ftp"][ftp_command]["ftp.request.command"]
-                )
                 res += layers["ftp"][ftp_command]["ftp.request.command"]
             elif "ftp.response.code" in layers["ftp"][ftp_command]:
-                self.server_message_types.add(
-                    layers["ftp"][ftp_command]["ftp.response.code"]
-                )
                 res += layers["ftp"][ftp_command]["ftp.response.code"]
             else:
-                if "-Q-" in res:
-                    self.client_message_types.add("UNKNOWN")
-                else:
-                    self.server_message_types.add("UNKNOWN")
                 res += "UNKNOWN"
             return res
         elif "ntp" in layers:
             res = "NTP"
             if layers["ntp"]["ntp.flags_tree"]["ntp.flags.mode"] == "3":
-                self.client_message_types.add(layers["ntp"]["ntp.flags"])
                 res += "-Q-"
             elif layers["ntp"]["ntp.flags_tree"]["ntp.flags.mode"] == "4":
-                self.server_message_types.add(layers["ntp"]["ntp.flags"])
                 res += "-R-"
             else:
                 res += "-UNKNOWN-"
@@ -93,10 +72,8 @@ class ResultsEvaluator:
         elif "icmp" in layers:
             res = "ICMP"
             if layers["icmp"]["icmp.type"] == "8":
-                self.client_message_types.add(layers["icmp"]["icmp.type"])
                 res += "-Q-"
             elif layers["icmp"]["icmp.type"] == "0":
-                self.server_message_types.add(layers["icmp"]["icmp.type"])
                 res += "-R-"
             else:
                 res += "-UNKNOWN-"
@@ -105,10 +82,8 @@ class ResultsEvaluator:
         elif "dhcp" in layers:
             res = "DHCP"
             if layers["dhcp"]["dhcp.type"] == "1":
-                self.client_message_types.add(layers["dhcp"]["dhcp.type"])
                 res += "-Q-"
             elif layers["dhcp"]["dhcp.type"] == "2":
-                self.server_message_types.add(layers["dhcp"]["dhcp.type"])
                 res += "-R-"
             else:
                 res += "-UNKNOWN-"
