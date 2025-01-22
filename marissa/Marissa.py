@@ -179,6 +179,22 @@ class Marissa:
                 os.path.join(self.output_path, f"output.{cluster_id}.clustal_num"),
             )
 
+    def align_all(self):
+        self.align_algorithm.encode(
+            self.df["hex"], os.path.join(self.output_path, "input.all.fasta")
+        )
+        self.logger.info("Aligning all data")
+        self.align_algorithm.run(
+            self.verbose,
+            os.path.join(self.output_path, "input.all.fasta"),
+            os.path.join(self.output_path, "output.all.clustal_num"),
+        )
+        self.logger.info("Decoding aligned data")
+        data_aligned = self.align_algorithm.decode(
+            os.path.join(self.output_path, "output.all.clustal_num")
+        )
+        self.df["aligned"] = data_aligned
+
     def merge_clusters(self):
         """Merge clusters based on the specified merger algorithm."""
         if len(self.clusters) > 2 and self.merger_algorithm is not None:
@@ -243,6 +259,14 @@ class Marissa:
                 self.df["cluster"] == cluster_id, "fields"
             ].apply(lambda x: fields)
 
+    def get_fields_all(self):
+        if "fields" not in self.df.columns:
+            self.df["fields"] = None
+
+        self.logger.debug(f"Finding fields")
+        fields = find_fields(self.df["aligned"])
+        self.df["fields"] = self.df["fields"].apply(lambda x: fields)
+
     def cleanup(self):
         """Clean up temporary files"""
         self.logger.debug("Cleaning up files")
@@ -253,13 +277,19 @@ class Marissa:
                     os.path.join(self.output_path, f"output.{cluster_id}.clustal_num"),
                 ]
             )
+        remove_files(
+            [
+                os.path.join(self.output_path, "input.all.fasta"),
+                os.path.join(self.output_path, "output.all.clustal_num"),
+            ]
+        )
 
     def save_results(self):
         """Save the results"""
         # Rename the cluster ids to be sequential
         self.df["cluster"] = pd.Categorical(self.df["cluster"]).codes
         self.clusters = self.df["cluster"].unique()
-        self.get_fields()
+        self.get_fields_all()
         self.save_results_to_file()
         self.save_cluster_data_to_pcap()
         self.df.to_csv(
@@ -332,7 +362,6 @@ class Marissa:
             )
         equals = self.print_align(cluster_packets["aligned"])
         f.write(f"{' '*(id_length+2)}{equals}\n")
-        self.logger.debug(f"Finding fields for cluster {cluster_id}")
         fields = cluster_packets["fields"].iloc[0]
         f.write(
             f"{', '.join(map(lambda x: f'{int(x[0]/2)}-{int(x[1]/2)}{x[2]}', fields))}\n\n"
@@ -376,9 +405,7 @@ class Marissa:
         self.prepare()
         self.perform_clustering()
         self.merge_clusters()
-        if self.merger_algorithm is not MergeByField:
-            self.align_clusters()
-            self.decode_aligned_clusters()
+        self.align_all()
         end_time = pd.Timestamp.now()
         self.running_time = end_time - start_time
         self.cleanup()
