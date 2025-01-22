@@ -44,10 +44,7 @@ class ResultsEvaluator:
     def get_packet_type(self, packet: dict) -> str:
         layers = packet["_source"]["layers"]
         if "dns" in layers:
-            res = "DNS-"
-            flags = layers["dns"]["dns.flags"]
-            message_type = res + str(flags)
-            return message_type
+            return "DNS" + layers["dns"]["dns.flags"]
         elif "ftp" in layers:
             res = "FTP"
             res += "-Q-" if layers["ftp"]["ftp.request"] == "1" else "-R-"
@@ -60,15 +57,7 @@ class ResultsEvaluator:
                 res += "UNKNOWN"
             return res
         elif "ntp" in layers:
-            res = "NTP"
-            if layers["ntp"]["ntp.flags_tree"]["ntp.flags.mode"] == "3":
-                res += "-Q-"
-            elif layers["ntp"]["ntp.flags_tree"]["ntp.flags.mode"] == "4":
-                res += "-R-"
-            else:
-                res += "-UNKNOWN-"
-            res += layers["ntp"]["ntp.flags"]
-            return res
+            return "NTP-" + layers["ntp"]["ntp.flags"]
         elif "icmp" in layers:
             res = "ICMP"
             if layers["icmp"]["icmp.type"] == "8":
@@ -80,15 +69,16 @@ class ResultsEvaluator:
             res += layers["icmp"]["icmp.type"]
             return res
         elif "dhcp" in layers:
-            res = "DHCP"
-            if layers["dhcp"]["dhcp.type"] == "1":
-                res += "-Q-"
-            elif layers["dhcp"]["dhcp.type"] == "2":
-                res += "-R-"
-            else:
-                res += "-UNKNOWN-"
-            res += layers["dhcp"]["dhcp.type"]
-            return res
+            return (
+                "DHCP"
+                + layers["dhcp"]["dhcp.type"]
+                + "-"
+                + layers["dhcp"]["dhcp.option.type_raw"][0]
+            )
+        elif "smb" in layers:
+            return "SMB" + layers["smb"]["SMB Header"]["smb.cmd"]
+        elif "nbns" in layers:
+            return "NBNS" + layers["nbns"]["nbns.flags"]
         return "UNKNOWN"
 
     def get_packet_fields(self, packet: dict) -> List[str]:
