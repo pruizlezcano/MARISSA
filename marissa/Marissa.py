@@ -35,6 +35,7 @@ class Marissa:
         remove_duplicates: bool = False,
         slice_packet: int = None,
         ignore_noise: bool = False,
+        layer: int = None,
     ):
         """Initialize the Marissa class.
 
@@ -55,6 +56,7 @@ class Marissa:
             remove_duplicates (bool, optional): Remove duplicate packets. Defaults to False.
             slice_packet (int, optional): Slice the packet at the given index. Defaults to None.
             ignore_noise (bool, optional): Ignore noise in the clusters (cluster -1). Defaults to False.
+            layer (int, optional): Layer to consider for clustering. Defaults to None.
         """
         self.input_file = input_file
         self.output_path = output
@@ -75,6 +77,7 @@ class Marissa:
         self.remove_duplicates = remove_duplicates
         self.slice_packet = slice_packet
         self.ignore_noise = ignore_noise
+        self.layer = layer
         self.df: pd.DataFrame
         self.running_time: pd.Timedelta
 
@@ -83,7 +86,7 @@ class Marissa:
         self.load_packets()
         if self.packet_length is not None:
             self.filter_packets_by_length()
-        if self.remove_headers:
+        if self.remove_headers or self.layer is not None:
             self.strip_headers()
         if self.remove_duplicates:
             self.remove_duplicate_packets()
@@ -121,7 +124,10 @@ class Marissa:
     def strip_headers(self):
         """Remove headers from packets."""
         self.logger.debug("Removing headers from data")
-        self.df["hex"] = [x.get_applayer() for x in self.df["raw"]]
+        if self.layer is not None:
+            self.df["hex"] = [x.get_layer(self.layer) for x in self.df["raw"]]
+        else:
+            self.df["hex"] = [x.get_applayer() for x in self.df["raw"]]
 
     def remove_duplicate_packets(self):
         """Remove duplicate packets."""
@@ -263,7 +269,7 @@ class Marissa:
         if "fields" not in self.df.columns:
             self.df["fields"] = None
 
-        self.logger.debug(f"Finding fields")
+        self.logger.debug("Finding fields")
         fields = find_fields(self.df["aligned"])
         self.df["fields"] = self.df["fields"].apply(lambda x: fields)
 

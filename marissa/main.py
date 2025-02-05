@@ -160,6 +160,12 @@ def main(
         "-n",
         help="Ignore noise points (cluster -1) in the results.",
     ),
+    layer: int = typer.Option(
+        None,
+        "--layer",
+        "-l",
+        help="The layer to get the hex from the packet.",
+    ),
 ):
     if (
         merge_type is not None
@@ -216,6 +222,7 @@ def main(
         remove_duplicates=remove_duplicates,
         slice_packet=slice_packet,
         ignore_noise=ignore_noise,
+        layer=layer,
     )
     marissa_runner.execute()
 

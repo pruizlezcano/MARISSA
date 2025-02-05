@@ -54,3 +54,19 @@ class Packet:
             counter += 1
 
         return layers
+
+    def get_layer(self, layer: int) -> str:
+        """Get the layer of the packet.
+
+        Args:
+            layer (int): Layer to get
+
+        Returns:
+            str: Hexadecimal representation of the layer
+        """
+        layers = self._get_packet_layers()
+
+        if layer >= len(layers):
+            return ""
+
+        return binascii.hexlify(bytes(layers[layer])).decode("utf-8")
