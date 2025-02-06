@@ -80,6 +80,7 @@ class Marissa:
         self.layer = layer
         self.df: pd.DataFrame
         self.running_time: pd.Timedelta
+        self.prefix = ""
 
     def prepare(self):
         """Prepare the data for clustering."""
@@ -94,6 +95,7 @@ class Marissa:
         if self.slice_packet is not None:
             self.df["hex"] = self.df["hex"].apply(lambda x: x[self.slice_packet :])
         self.max_length = max(self.df["length"])
+        self.remove_prefix()
 
     def load_packets(self):
         """Load packets from the input file and calculate necessary features."""
@@ -120,6 +122,19 @@ class Marissa:
                 )
             ]
         self.logger.info(f"{len(self.df)} packets remain after filtering by length")
+
+    def remove_prefix(self):
+        """Find the common prefix of all packets and remove it."""
+        self.logger.debug("Finding common prefix")
+        prefix = self.df["hex"].iloc[0]
+        for packet in self.df["hex"]:
+            i = 0
+            while i < len(prefix) and i < len(packet) and prefix[i] == packet[i]:
+                i += 1
+            prefix = prefix[:i]
+        self.logger.debug(f"Common prefix: {prefix}")
+        self.prefix = prefix
+        self.df["hex"] = self.df["hex"].apply(lambda x: x[len(prefix) :])
 
     def strip_headers(self):
         """Remove headers from packets."""
@@ -411,6 +426,8 @@ class Marissa:
         self.prepare()
         self.perform_clustering()
         self.merge_clusters()
+        # Add the prefix back to the packets
+        self.df["hex"] = self.df["hex"].apply(lambda x: self.prefix + x)
         self.align_all()
         end_time = pd.Timestamp.now()
         self.running_time = end_time - start_time
