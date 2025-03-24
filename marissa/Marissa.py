@@ -80,7 +80,7 @@ class Marissa:
         self.layer = layer
         self.df: pd.DataFrame
         self.running_time: pd.Timedelta
-        self.prefix = ""
+        self.prefix = None
 
     def prepare(self):
         """Prepare the data for clustering."""
@@ -132,6 +132,8 @@ class Marissa:
             while i < len(prefix) and i < len(packet) and prefix[i] == packet[i]:
                 i += 1
             prefix = prefix[:i]
+        if len(prefix) == 0:
+            self.logger.debug("No common prefix found")
         self.logger.debug(f"Common prefix: {prefix}")
         self.prefix = prefix
         self.df["hex"] = self.df["hex"].apply(lambda x: x[len(prefix) :])
@@ -343,6 +345,7 @@ class Marissa:
                     "slice_packet": self.slice_packet,
                     "ignore_noise": self.ignore_noise,
                     "running_time": self.running_time.total_seconds(),
+                    "common_prefix": self.prefix,
                 },
                 f,
                 indent=4,
@@ -427,7 +430,8 @@ class Marissa:
         self.perform_clustering()
         self.merge_clusters()
         # Add the prefix back to the packets
-        self.df["hex"] = self.df["hex"].apply(lambda x: self.prefix + x)
+        if self.prefix is not None:
+            self.df["hex"] = self.df["hex"].apply(lambda x: self.prefix + x)
         self.align_all()
         end_time = pd.Timestamp.now()
         self.running_time = end_time - start_time
