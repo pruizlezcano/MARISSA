@@ -39,6 +39,8 @@ class ResultsEvaluator:
             packet["_source"]["layers"].pop("tcp")
         if "vlan" in packet["_source"]["layers"]:
             packet["_source"]["layers"].pop("vlan")
+        if "nbss" in packet["_source"]["layers"]:
+            packet["_source"]["layers"].pop("nbss")
         return packet
 
     def get_packet_type(self, packet: dict) -> str:
@@ -73,12 +75,23 @@ class ResultsEvaluator:
                 "DHCP"
                 + layers["dhcp"]["dhcp.type"]
                 + "-"
-                + layers["dhcp"]["dhcp.option.type_raw"][0]
+                + layers["dhcp"]["dhcp.type_raw"][0]
             )
         elif "smb" in layers:
             return "SMB" + layers["smb"]["SMB Header"]["smb.cmd"]
         elif "nbns" in layers:
             return "NBNS" + layers["nbns"]["nbns.flags"]
+        elif "modbus" in layers:
+            return "MODBUS-" + layers["modbus"]["modbus.func_code"]
+        elif "s7comm" in layers:
+            return (
+                "S7COMM-"
+                + layers["s7comm"]["s7comm.header"]["s7comm.header.rosctr"]
+                + "-"
+                + layers["s7comm"]["s7comm.param"]["s7comm.param.func"]
+            )
+        elif "mqtt" in layers:
+            return "MQTT-" + layers["mqtt"]["mqtt.hdrflags"]
         return "UNKNOWN"
 
     def get_packet_fields(self, packet: dict) -> List[str]:
@@ -90,6 +103,8 @@ class ResultsEvaluator:
             "icmp.seq_le_raw",
             "ftp.request.arg_raw",
             "ip.hdr_len_raw",
+            "tpkt",
+            "cotp",
         ]
         for key, value in packet.items():
             if "payload" in key or "tree" in key or key in ignore_keys:
@@ -271,11 +286,27 @@ if __name__ == "__main__":
         sys.exit(1)
     if not os.path.exists(sys.argv[1]):
         print(f"File {sys.argv[1]} does not exist")
+        sys.exit(1)
+
     evaluator = ResultsEvaluator(sys.argv[1])
     cluster_stats, fields_stats = evaluator.analyze()
-    print(cluster_stats)
-    print("Cluster statistics:")
+
+    # Calculate mean field stats
     stats_df = pd.DataFrame(fields_stats).T
-    stats_mean = stats_df.mean()
-    print("Mean fields statistics:")
-    print(stats_mean.to_dict())
+    fields_mean = stats_df.mean().to_dict()
+
+    # Create output structure
+    output = {
+        "cluster_stats": cluster_stats,
+        "fields_stats": fields_mean,
+        "running_time": evaluator.meta.get("running_time", 0),
+        "clusters": evaluator.meta.get("clusters", 0),
+    }
+
+    # Save to JSON file
+    output_file = sys.argv[1].replace(".csv", "_stats.json")
+    with open(output_file, "w") as f:
+        json.dump(output, f, indent=4)
+
+    print(f"Statistics saved to {output_file}")
+    print(json.dumps(output, indent=4))
