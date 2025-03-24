@@ -21,13 +21,10 @@ class Pcap:
         Returns:
             List[Packet]: List of packets in the pcap file.
         """
-        content = []
         with open(filename, "rb") as f:
             pcap = scapy.rdpcap(f)
-            for packet in pcap:
-                content.append(Packet(packet))
 
-        return content
+        return [Packet(packet) for packet in pcap]
 
     @staticmethod
     def write(packets: List[str], filename: str) -> None:

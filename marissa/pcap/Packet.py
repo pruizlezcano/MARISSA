@@ -9,9 +9,18 @@ class Packet:
 
     def __init__(self, packet: ScapyPacket) -> None:
         self.packet = packet
-        self.hex = binascii.hexlify(bytes(packet)).decode("utf-8")
-        self.length = len(self.hex)
-        self.timestamp = float(packet.time)
+
+    @property
+    def hex(self):
+        return binascii.hexlify(bytes(self.packet)).decode("utf-8")
+
+    @property
+    def length(self):
+        return len(self.hex)
+
+    @property
+    def timestamp(self):
+        return self.packet.time
 
     def __str__(self):
         return self.hex
