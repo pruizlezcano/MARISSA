@@ -26,6 +26,27 @@ class AlignmentAlgorithm(ABC):
         self.logger = Logger()
 
     @staticmethod
+    def _add_byte_separators(item: str, separator: str = "~") -> str:
+        """Add separators between each pair of characters (representing bytes).
+
+        Args:
+            item (str): String to add separators to.
+            separator (str, optional): Character to use as separator. Defaults to "~".
+
+        Returns:
+            str: String with separators added between byte pairs.
+        """
+        result = ""
+        for i in range(0, len(item), 2):
+            if i + 1 < len(item):
+                result += item[i] + item[i + 1]
+                if i + 2 < len(item):  # Don't add separator after the last byte
+                    result += separator
+            else:
+                result += item[i]  # Handle odd-length strings
+        return result
+
+    @staticmethod
     def _to_dna_sequence(item: str) -> str:
         """Convert an item to a DNA sequence.
 
@@ -38,7 +59,7 @@ class AlignmentAlgorithm(ABC):
         item = item.upper()
         for key, value in conversion_table.items():
             item = item.replace(key, value)
-        return item
+        return AlignmentAlgorithm._add_byte_separators(item)
 
     def encode(self, data: List[str], output_file: str):
         """Encode the data to a file.
@@ -55,6 +76,33 @@ class AlignmentAlgorithm(ABC):
                 f.write(f"{dna_sequence}\n")
 
     @staticmethod
+    def _remove_characters(data: List[str]) -> List[str]:
+        """Remove columns that contain only padding characters across all packets.
+
+        This function examines each position/column across all packets and removes
+        positions where every packet has only a padding character ('-' or '~').
+        This is useful for removing alignment gaps that don't contain any actual data.
+
+        Args:
+            data (List[str]): List of aligned packets with padding
+
+        Returns:
+            List[str]: List of packets with unnecessary padding columns removed
+        """
+        res = [list() for i in range(len(data))]
+        for i in range(len(data[0])):
+            isToDelete = True
+            for line in data:
+                if line[i] != "-" and line[i] != "~":
+                    isToDelete = False
+                    break
+            if not isToDelete:
+                for j, line in enumerate(data):
+                    res[j].append(line[i])
+        res = ["".join(line) for line in res]
+        return res
+
+    @staticmethod
     def _to_hex(dna: str) -> str:
         """Convert a DNA sequence to hexadecimal.
 
@@ -64,10 +112,27 @@ class AlignmentAlgorithm(ABC):
         Returns:
             str: Hexadecimal string.
         """
-        dna = dna.upper()
+        dna = dna.replace("~", "").upper()
         for key, value in conversion_table.items():
             dna = dna.replace(value, key)
         return dna
+
+    @staticmethod
+    def _pad_packets(packets: List[str], pad_char: str = "-") -> List[str]:
+        """Pad all packets to the length of the longest packet.
+
+        Args:
+            packets (List[str]): List of packets to pad
+            pad_char (str, optional): Character to use for padding. Defaults to "-".
+
+        Returns:
+            List[str]: List of padded packets with uniform length
+        """
+        if not packets:
+            return []
+
+        longest = max([len(packet) for packet in packets])
+        return [packet.ljust(longest, pad_char) for packet in packets]
 
     def decode(self, input_file: str) -> List[str]:
         """Decode the data from a file.
@@ -95,11 +160,7 @@ class AlignmentAlgorithm(ABC):
                 buffer = self._to_hex(msg)
                 packets.append(buffer)
 
-        # find the length of the longest packet
-        longest = max([len(packet) for packet in packets])
-
-        # pad all packets to the length of the longest packet
-        packets = [packet.ljust(longest, "-") for packet in packets]
+        packets = self._pad_packets(packets)
 
         return packets
 

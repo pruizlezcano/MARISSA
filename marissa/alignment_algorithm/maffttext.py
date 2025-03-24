@@ -13,7 +13,7 @@ class MafftTextAlgorithm(AlignmentAlgorithm):
         with open(output_file, "w") as f:
             for i, item in enumerate(data):
                 f.write(f">MSG.{i:0{len(str(len(data)))}}\n")
-                f.write(f"{item}\n")
+                f.write(f"{AlignmentAlgorithm._add_byte_separators(item)}\n")
 
     def decode(self, input_file: str) -> List[int]:
         data = self.read_file(os.path.abspath(input_file))
@@ -27,11 +27,14 @@ class MafftTextAlgorithm(AlignmentAlgorithm):
                 packet += line
         packets.append(packet)
 
-        # find the length of the longest packet
-        longest = max([len(packet) for packet in packets])
+        # Initial padding to make all packets the same length
+        packets = self._pad_packets(packets)
 
-        # pad all packets to the length of the longest packet
-        packets = [packet.ljust(longest, "-") for packet in packets]
+        packets = self._remove_characters(packets)
+
+        # After removing characters, ensure all have same final length
+        packets = self._pad_packets(packets)
+        return packets
 
         return packets
 

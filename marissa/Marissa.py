@@ -217,6 +217,12 @@ class Marissa:
             os.path.join(self.output_path, "output.all.clustal_num")
         )
         self.df["aligned"] = data_aligned
+        for cluster_id in self.clusters:
+            self.df.loc[self.df["cluster"] == cluster_id, "aligned"] = (
+                AlignmentAlgorithm._remove_characters(
+                    self.df.loc[self.df["cluster"] == cluster_id, "aligned"].to_list()
+                )
+            )
 
     def merge_clusters(self):
         """Merge clusters based on the specified merger algorithm."""
