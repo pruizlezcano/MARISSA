@@ -5,10 +5,9 @@ from typing import List
 import pandas as pd
 
 from marissa.alignment_algorithm import AlignmentAlgorithm
-from marissa.cluster_algorithm import ClusterAlgorithm
-from marissa.cluster_merger import ClusterMerger
-from marissa.cluster_merger.merge_by_field import MergeByField
-from marissa.distance_metrics import DistanceAlgorithm
+from marissa.cluster_algorithm import ClusterAlgorithm, OpticsAlgorithm
+from marissa.cluster_merger import ClusterMerger, MergeByField
+from marissa.distance_metrics import DistanceAlgorithm, SSDEEPDistance
 from marissa.Logger import Logger
 from marissa.pcap import Pcap
 from marissa.utils import find_fields, remove_files
@@ -26,9 +25,9 @@ class Marissa:
         input_file=None,
         output=None,
         remove_headers: bool = False,
-        distance_algorithm: DistanceAlgorithm = None,
-        cluster_algorithm: ClusterAlgorithm = None,
-        cluster_merger: ClusterMerger = None,
+        distance_algorithm: DistanceAlgorithm = SSDEEPDistance,
+        cluster_algorithm: ClusterAlgorithm = OpticsAlgorithm,
+        cluster_merger: ClusterMerger = MergeByField,
         merge_threshold: float = None,
         align_algorithm: AlignmentAlgorithm = None,
         group_by_ethernet: bool = False,
@@ -47,9 +46,9 @@ class Marissa:
             input_file (str, optional): Input .pcap file path. Defaults to None.
             output (str, optional): Path of the directory to write the results to. Defaults to None.
             remove_headers (bool, optional): Should remove the message headers. Defaults to False.
-            distance_algorithm (DistanceAlgorithm, optional): Algorithm to calculate distance between packets. Defaults to None.
-            cluster_algorithm (ClusterAlgorithm, optional): Algorithm to cluster packets. Defaults to None.
-            cluster_merger (ClusterMerger, optional): Algorithm to merge clusters. Defaults to None.
+            distance_algorithm (DistanceAlgorithm, optional): Algorithm to calculate distance between packets. Defaults to SSDEEPDistance.
+            cluster_algorithm (ClusterAlgorithm, optional): Algorithm to cluster packets. Defaults to OpticsAlgorithm.
+            cluster_merger (ClusterMerger, optional): Algorithm to merge clusters. Defaults to MergeByField.
             merge_threshold (float, optional): Threshold for merging clusters. Defaults to None.
             align_algorithm (AlignmentAlgorithm, optional): Algorithm to align packets. Defaults to None.
             group_by_ethernet (bool, optional): Group packets by Ethernet header. Defaults to False.
