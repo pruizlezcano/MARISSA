@@ -12,10 +12,6 @@ from marissa import (
     MafftAlgorithm,
     MafftTextAlgorithm,
     Marissa,
-    MergeByCalinskiHarabasz,
-    MergeByDaviesBouldin,
-    MergeByField,
-    MergeBySilhouette,
     MuscleAlgorithm,
     OpticsAlgorithm,
     ProbconsAlgorithm,
@@ -141,19 +137,6 @@ def main(
         "-s",
         help="Remove the first x characters of the packet.",
     ),
-    merge_type: Merge_Types = typer.Option(
-        None,
-        "--merge-type",
-        "-m",
-        help="The merge algorithm to use.",
-        case_sensitive=False,
-    ),
-    merge_threshold: float = typer.Option(
-        None,
-        "--merge-threshold",
-        "-t",
-        help="The threshold to merge the clusters. Required if merge-type is not 'field'.",
-    ),
     ignore_noise: bool = typer.Option(
         False,
         "--ignore-noise",
@@ -167,14 +150,6 @@ def main(
         help="The layer to get the hex from the packet.",
     ),
 ):
-    if (
-        merge_type is not None
-        and merge_type != Merge_Types.field
-        and merge_threshold is None
-    ):
-        raise typer.BadParameter(
-            "merge-threshold is required if merge-type is not 'field'"
-        )
     distance_type = {
         Distance_Types.tlsh: TLSHDistance,
         Distance_Types.ssdeep: SSDEEPDistance,
@@ -193,12 +168,6 @@ def main(
         Align_Types.famsa: FamsaAlgorithm,
         Align_Types.probcons: ProbconsAlgorithm,
     }[align_type]
-    merge_type = {
-        Merge_Types.field: MergeByField,
-        Merge_Types.silhouette: MergeBySilhouette,
-        Merge_Types.calinski_harabasz: MergeByCalinskiHarabasz,
-        Merge_Types.davies_bouldin: MergeByDaviesBouldin,
-    }.get(merge_type)
     pcap_name = os.path.basename(pcap)
     results_path = f"./results/{pcap_name}" if output is None else output
     os.makedirs(results_path, exist_ok=True)
@@ -215,8 +184,6 @@ def main(
         remove_headers=remove_headers,
         distance_algorithm=distance_type,
         cluster_algorithm=cluster_type,
-        cluster_merger=merge_type,
-        merge_threshold=merge_threshold,
         align_algorithm=align_type,
         group_by_ethernet=group_by_ethernet,
         remove_duplicates=remove_duplicates,

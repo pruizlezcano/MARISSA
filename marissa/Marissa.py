@@ -28,7 +28,6 @@ class Marissa:
         distance_algorithm: DistanceAlgorithm = SSDEEPDistance,
         cluster_algorithm: ClusterAlgorithm = OpticsAlgorithm,
         cluster_merger: ClusterMerger = MergeByField,
-        merge_threshold: float = None,
         align_algorithm: AlignmentAlgorithm = None,
         group_by_ethernet: bool = False,
         remove_duplicates: bool = False,
@@ -49,7 +48,6 @@ class Marissa:
             distance_algorithm (DistanceAlgorithm, optional): Algorithm to calculate distance between packets. Defaults to SSDEEPDistance.
             cluster_algorithm (ClusterAlgorithm, optional): Algorithm to cluster packets. Defaults to OpticsAlgorithm.
             cluster_merger (ClusterMerger, optional): Algorithm to merge clusters. Defaults to MergeByField.
-            merge_threshold (float, optional): Threshold for merging clusters. Defaults to None.
             align_algorithm (AlignmentAlgorithm, optional): Algorithm to align packets. Defaults to None.
             group_by_ethernet (bool, optional): Group packets by Ethernet header. Defaults to False.
             remove_duplicates (bool, optional): Remove duplicate packets. Defaults to False.
@@ -70,7 +68,6 @@ class Marissa:
         self.distance_algorithm: DistanceAlgorithm = distance_algorithm()
         self.cluster_algorithm: ClusterAlgorithm = cluster_algorithm
         self.merger_algorithm: ClusterMerger = cluster_merger
-        self.merge_threshold = merge_threshold
         self.align_algorithm: AlignmentAlgorithm = align_algorithm()
         self.group_by_ethernet = group_by_ethernet
         self.remove_duplicates = remove_duplicates
@@ -236,7 +233,7 @@ class Marissa:
                     self.cluster_algorithm, self.distance_algorithm
                 )
             self.df, need_realignment = merger_algorithm.merge(
-                df=self.df, threshold=self.merge_threshold
+                df=self.df
             )
             if need_realignment:
                 new_clusters = self.df["cluster"].unique()
@@ -341,7 +338,6 @@ class Marissa:
                         if self.merger_algorithm is not None
                         else None
                     ),
-                    "merge_threshold": self.merge_threshold,
                     "clusters": len(self.clusters),
                     "packet_count": len(self.df),
                     "remove_headers": self.remove_headers,

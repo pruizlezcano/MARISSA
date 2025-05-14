@@ -22,7 +22,6 @@ class ClusterMerger(ABC):
     def merge(
         self,
         df: DataFrame,
-        threshold: float = None,
     ) -> Tuple[DataFrame, bool]:
         """Merge clusters based on some criteria.
 

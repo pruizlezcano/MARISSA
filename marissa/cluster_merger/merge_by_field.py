@@ -12,7 +12,6 @@ class MergeByField(ClusterMerger):
     def merge(
         self,
         df: DataFrame,
-        threshold: float = None,
     ) -> Tuple[DataFrame, bool]:
         self.logger.info("Merging clusters with the same field")
         need_realignment = False
