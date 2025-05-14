@@ -44,6 +44,9 @@ class Packet:
         if layers[app_layer].name == "TCP" or layers[app_layer].name == "UDP":
             app_layer += 1
 
+        if app_layer >= len(layers):
+            app_layer = len(layers) - 1
+
         return binascii.hexlify(bytes(layers[app_layer])).decode("utf-8")
 
     def _get_packet_layers(self) -> List[ScapyPacket]:
