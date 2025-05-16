@@ -206,11 +206,11 @@ class Marissa:
         self.align_algorithm.run(
             self.verbose,
             os.path.join(self.output_path, "input.all.fasta"),
-            os.path.join(self.output_path, "output.all.clustal_num"),
+            os.path.join(self.output_path, "output.all.fasta"),
         )
         self.logger.info("Decoding aligned data")
         data_aligned = self.align_algorithm.decode(
-            os.path.join(self.output_path, "output.all.clustal_num")
+            os.path.join(self.output_path, "output.all.fasta")
         )
         self.df["aligned"] = data_aligned
         for cluster_id in self.clusters:
@@ -245,7 +245,7 @@ class Marissa:
                                     self.output_path, f"input.{cluster_id}.fasta"
                                 ),
                                 os.path.join(
-                                    self.output_path, f"output.{cluster_id}.clustal_num"
+                                    self.output_path, f"output.{cluster_id}.fasta"
                                 ),
                             ]
                         )
@@ -260,7 +260,7 @@ class Marissa:
         for cluster_id in self.clusters:
             self.logger.debug(f"Decoding aligned data for cluster {cluster_id}")
             data_aligned = self.align_algorithm.decode(
-                os.path.join(self.output_path, f"output.{cluster_id}.clustal_num")
+                os.path.join(self.output_path, f"output.{cluster_id}.fasta")
             )
             if len(data_aligned) == 0:
                 self.logger.warning(
@@ -299,13 +299,13 @@ class Marissa:
             remove_files(
                 [
                     os.path.join(self.output_path, f"input.{cluster_id}.fasta"),
-                    os.path.join(self.output_path, f"output.{cluster_id}.clustal_num"),
+                    os.path.join(self.output_path, f"output.{cluster_id}.fasta"),
                 ]
             )
         remove_files(
             [
                 os.path.join(self.output_path, "input.all.fasta"),
-                os.path.join(self.output_path, "output.all.clustal_num"),
+                os.path.join(self.output_path, "output.all.fasta"),
             ]
         )
 
