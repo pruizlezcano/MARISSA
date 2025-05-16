@@ -1,6 +1,6 @@
 import json
 import os
-from typing import List
+from typing import List, Optional, Type
 
 import pandas as pd
 
@@ -18,24 +18,25 @@ class Marissa:
 
     def __init__(
         self,
-        verbose=False,
-        packet_length: int = None,
-        packet_length_variance: int = None,
-        percent_equal: int = 1,
-        input_file=None,
-        output=None,
+        verbose: bool = False,
+        packet_length: Optional[int] = None,
+        packet_length_variance: Optional[int] = None,
+        percent_equal: float = 1.0,
+        input_file: Optional[str] = None,
+        output: Optional[str] = None,
         remove_headers: bool = False,
-        distance_algorithm: DistanceAlgorithm = SSDEEPDistance,
-        cluster_algorithm: ClusterAlgorithm = OpticsAlgorithm,
-        cluster_merger: ClusterMerger = MergeByField,
-        align_algorithm: AlignmentAlgorithm = None,
+        distance_algorithm: Type[DistanceAlgorithm] = SSDEEPDistance,
+        cluster_algorithm: Type[ClusterAlgorithm] = OpticsAlgorithm,
+        cluster_merger: Type[ClusterMerger] = MergeByField,
+        align_algorithm: Optional[Type[AlignmentAlgorithm]] = None,
         group_by_ethernet: bool = False,
         remove_duplicates: bool = False,
-        slice_packet: int = None,
+        slice_packet: Optional[int] = None,
         ignore_noise: bool = False,
-        layer: int = None,
-    ):
-        """Initialize the Marissa class.
+        layer: Optional[int] = None,
+    ) -> None:
+        """
+        Initialize a new Marissa instance.
 
         Args:
             verbose (bool, optional): Print debug statements. Defaults to False.
@@ -94,7 +95,7 @@ class Marissa:
         self.remove_prefix()
 
     def load_packets(self):
-        """Load packets from the input file and calculate necessary features."""
+        """Load packets from the input PCAP file and calculate necessary features."""
         self.logger.debug("Loading data from input file")
         packets = Pcap.load(self.input_file)
         self.logger.info(f"Loaded {len(packets)} packets")
@@ -107,7 +108,15 @@ class Marissa:
             self.df["ethernet"] = self.df["hex"].apply(lambda x: x[:24])
 
     def filter_packets_by_length(self):
-        """Filter packets by specified length."""
+        """
+        Filter packets based on specified length criteria.
+
+        Uses packet_length and packet_length_variance parameters to keep only packets
+        within the specified length range: [length-variance, length+variance].
+
+        This is useful for isolating specific message types that have consistent
+        sizes or fall within a known size range.
+        """
         self.logger.debug("Filtering data by packet length")
         if self.packet_length is not None:
             self.df = self.df[
@@ -143,14 +152,21 @@ class Marissa:
             self.df["hex"] = [x.get_applayer() for x in self.df["raw"]]
 
     def remove_duplicate_packets(self):
-        """Remove duplicate packets."""
+        """
+        Remove duplicate packets from the dataset.
+
+        Duplicates are identified based on their hex representation.
+        This helps reduce noise in the analysis and focus on unique
+        message formats. Index is reset after removal to maintain
+        contiguous packet IDs.
+        """
         self.logger.debug("Removing duplicate packets")
         self.df = self.df.drop_duplicates("hex")
         self.df = self.df.reset_index(drop=True)
         self.logger.info(f"{len(self.df)} packets remain after removing duplicates")
 
     def perform_clustering(self):
-        """Cluster the packets."""
+        """Cluster packets based on similarity."""
         self.logger.info("Performing clustering...")
         if self.group_by_ethernet:
             # get groups of packets with the same ethernet header
@@ -179,7 +195,17 @@ class Marissa:
         self.df["id_cluster"] = self.df.groupby("cluster").cumcount()
 
     def encode_packets(self):
-        """Encode the packets and save them to files."""
+        """
+        Prepare packets for multiple sequence alignment.
+
+        For each cluster:
+            1. Takes hex representations of packets
+            2. Encodes them in FASTA format
+            3. Saves to a cluster-specific file
+
+        Files are saved as 'input.{cluster_id}.fasta' in the output directory.
+        These files serve as input for the alignment algorithm.
+        """
         for cluster_id, cluster_packets in self.df.groupby("cluster"):
             self.align_algorithm.encode(
                 cluster_packets["hex"],
@@ -187,7 +213,16 @@ class Marissa:
             )
 
     def align_clusters(self):
-        """Align the clusters."""
+        """
+        Perform multiple sequence alignment on each cluster.
+
+        For each cluster:
+            1. Loads encoded packets from FASTA file
+            2. Runs selected alignment algorithm
+            3. Saves aligned sequences
+
+        Output files are named 'output.{cluster_id}.fasta'.
+        """
         self.encode_packets()
         self.logger.info("Aligning data")
         for cluster_id in self.clusters:
@@ -195,10 +230,23 @@ class Marissa:
             self.align_algorithm.run(
                 self.verbose,
                 os.path.join(self.output_path, f"input.{cluster_id}.fasta"),
-                os.path.join(self.output_path, f"output.{cluster_id}.clustal_num"),
+                os.path.join(self.output_path, f"output.{cluster_id}.fasta"),
             )
 
     def align_all(self):
+        """
+        Perform multiple sequence alignment on all packets together.
+
+        This method:
+        1. Encodes all packets into single FASTA file
+        2. Runs alignment algorithm on entire dataset
+        3. Decodes aligned sequences
+        4. Updates DataFrame with aligned sequences
+        5. Removes gap characters per cluster
+
+        This global alignment can reveal patterns across different clusters
+        and help identify related message formats.
+        """
         self.align_algorithm.encode(
             self.df["hex"], os.path.join(self.output_path, "input.all.fasta")
         )
@@ -232,9 +280,7 @@ class Marissa:
                 merger_algorithm = self.merger_algorithm(
                     self.cluster_algorithm, self.distance_algorithm
                 )
-            self.df, need_realignment = merger_algorithm.merge(
-                df=self.df
-            )
+            self.df, need_realignment = merger_algorithm.merge(df=self.df)
             if need_realignment:
                 new_clusters = self.df["cluster"].unique()
                 for cluster_id in self.clusters:

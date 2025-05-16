@@ -92,7 +92,7 @@ def main(
         1,
         "--percent-equal",
         "-e",
-        help="The percentage of equal packets to consider. [0-1]",
+        help="The percentage of equal packets to consider for representation. [0-1]",
     ),
     remove_headers: bool = typer.Option(
         None,
