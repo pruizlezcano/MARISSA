@@ -6,16 +6,18 @@ MARISSA (MessAge foRmat Inference with Similarity digeSt Algorithms) is a tool f
 
 ## Installation
 
-### Prequisites
+### Manual
+
+#### Prequisites
 * [Python](https://www.python.org/) 3.11
 * [Poetry](https://python-poetry.org/) dependency manager
 * One or more Multiple Sequence Alignment tools (check the paper for details):
-  * [MAFFT](https://mafft.cbrc.jp/alignment/software/)
+  * [MAFFT](https://mafft.cbrc.jp/alignment/software/) ⭐
   * [Clustal Omega](http://www.clustal.org/omega/)
   * [MUSCLE](https://github.com/rcedgar/muscle)
   * [FAMSA](https://github.com/refresh-bio/FAMSA)
 
-### Steps
+#### Steps
 1. Clone the repository:
    ```bash
    git clone https://github.com/pruizlezcano/MARISSA.git
@@ -27,6 +29,37 @@ MARISSA (MessAge foRmat Inference with Similarity digeSt Algorithms) is a tool f
    ```
 
 3. Install at least one Multiple Sequence Alignment tool (see Prerequisites)
+
+### Docker
+
+> [!NOTE]  
+> This docker image only has MAFFT installed. If you want to use other alignment tools, you need to install them manually.
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/pruizlezcano/MARISSA.git
+   ```
+2. Build the Docker image:
+   ```bash
+   docker build -t marissa .
+   ```
+3. Run the Docker container:
+   ```bash
+   docker run -v "$(pwd):/data" marissa -i /data/input.pcap -o /data/results/input.pcap -v
+   ```
+
+ > [!IMPORTANT]
+ > **Understanding the `-v "$(pwd):/data"` volume mount:**
+ > This part of the command is crucial for letting MARISSA (running inside the Docker container) access your files and save results back to your computer.
+ >
+ > * `$(pwd)`: This is a shortcut that automatically uses the path to your current working directory on your computer (the folder you're in when you run the command).
+ > * `/data`: This is the path *inside* the Docker container where your current directory will be made available.
+ >
+ > **What this means for you:**
+ > * **Input files:** If you have `input.pcap` in your current directory, MARISSA can access it as `/data/input.pcap` from within the container.
+ > * **Output files:** When MARISSA saves results to a path like `/data/results/input.pcap` inside the container, these files will actually appear in a `results/input.pcap` subfolder within your current directory on your computer.
+ >
+ > In simple terms, it makes using MARISSA with Docker much more straightforward.
 
 ## Usage
 
@@ -45,7 +78,7 @@ marissa -i input.pcap --remove-duplicates --remove-headers -v
 * `--remove-headers`: Remove headers from the packets.
 * `--distance-algorithm`, `-d` [`tlsh`|`ssdeep`|`hamming`]: The distance algorithm to use for comparing packet similarity. Default is `ssdeep`.
 * `--cluster-algorithm`, `-c` [`optics`|`kmeans`|`kmeans_hierarchical`]: The clustering algorithm to use. Default is `optics`.
-* `--align-algorithm`, `-a` [`clustalo`|`maffttext`|`mafft`|`muscle`|`famsa`|`probcons`]: The alignment algorithm to use. Default is `mafft`.
+* `--align-algorithm`, `-a` [`clustalo`|`maffttext`|`mafft`|`muscle`|`famsa`]: The alignment algorithm to use. Default is `mafft`.
 * `--group_by_ethernet`, `-eth`: Group packets by their ethernet header and remove it before clustering.
 * `--remove-duplicates`: Remove duplicate packets before clustering.
 * `--slice-packet`, `-s` `INTEGER`: Remove the first x characters of the packet.
